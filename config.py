@@ -1,8 +1,39 @@
 import asyncio
+import os
+import subprocess
+
+
+def ensure_dependencies(requirements: list[str]):
+    import importlib.util
+    missing_packages = [
+        pkg for pkg in requirements if not importlib.util.find_spec(pkg)
+    ]
+
+    if not missing_packages:
+        return
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    python = os.path.join(script_dir, '.venv', "bin", 'python')
+    subprocess.run([python, "-m", "ensurepip"])
+    subprocess.run([python, "-m", "pip", "install", *missing_packages])
+
+
+ensure_dependencies([
+    "wakeonlan",
+    # "mijiaAPI",
+    # "yt-dlp",
+])
 
 kws_wakeup = ["小智小智"]
-# The handlers that actually performs the functionality is defined in kws_handler.
-kws_command = ["唤醒电脑", "打开空调", "播放音乐"]
+kws_command = [
+    "切换电视", "打开空调", "关闭空调", "打开风扇", "关闭风扇", "切换主灯", "打开台灯", "关闭台灯", "关闭副灯",
+    "打开副灯", "点亮外面", "熄灭外面", "全部关闭"
+]
+kws_pc_control = ["打开电脑", "切换屏幕", "关闭电脑", "重启电脑", "按下空格"]
+
+
+async def xiaomusic_handler(speaker, text):
+    pass
 
 
 async def _pause_xiaoai(speaker):
@@ -11,61 +42,66 @@ async def _pause_xiaoai(speaker):
 
 
 async def kws_handler(speaker, text):
-    """
-    用于处理关键字唤醒后的一级指令
-    """
-    # cases must in kws_command
     match text:
-        case "唤醒电脑":
-            from custom_modules import wol
-
-            await speaker.play(text="正在唤醒电脑")
-            await wol.wake_on_lan("08:BF:B8:A6:7C:E2")
+        case "小智小智":
+            await speaker.play(text="小智来了")
+            return True
+        # kws_command
+        case "切换电视":
+            await speaker.ask_xiaoai(text="关闭电视", silent=True)
         case "打开空调":
-            await speaker.ask_xiaoai(text="打开空调")
-        case "播放音乐":
-            from custom_modules import xiaomusic
-
-            await _pause_xiaoai(speaker)
-            await xiaomusic.xiaomusic_handler(speaker, text)
-        # TODO: 计算机控制
-        # 方案一：依赖巴法云 mqtt (曾经的 cut in xiaoai 项目)
-        # 方案二：用 fastapi 沟通客户端直接通信
+            await speaker.ask_xiaoai(text="打开空调", silent=True)
+        case "关闭空调":
+            await speaker.ask_xiaoai(text="关闭空调", silent=True)
+        case "打开风扇":
+            await speaker.ask_xiaoai(text="打开风扇", silent=True)
+        case "关闭风扇":
+            await speaker.ask_xiaoai(text="关闭风扇", silent=True)
+        case "切换主灯":
+            await speaker.ask_xiaoai(text="关闭主灯", silent=True)
+        case "打开台灯":
+            await speaker.ask_xiaoai(text="打开台灯", silent=True)
+        case "关闭台灯":
+            await speaker.ask_xiaoai(text="关闭台灯", silent=True)
+        case "关闭副灯":
+            await speaker.ask_xiaoai(text="关闭副灯", silent=True)
+        case "打开副灯":
+            await speaker.ask_xiaoai(text="打开副灯", silent=True)
+        case "点亮外面":
+            await speaker.ask_xiaoai(text="打开台灯", silent=True)
+            await speaker.ask_xiaoai(text="打开副灯", silent=True)
+        case "熄灭外面":
+            await speaker.ask_xiaoai(text="关闭台灯", silent=True)
+            await speaker.ask_xiaoai(text="关闭副灯", silent=True)
+        case "全部关闭":
+            await speaker.ask_xiaoai(text="关闭空调", silent=True)
+            await speaker.ask_xiaoai(text="关闭风扇", silent=True)
+            await speaker.ask_xiaoai(text="关闭主灯", silent=True)
+            await speaker.ask_xiaoai(text="关闭台灯", silent=True)
+            await speaker.ask_xiaoai(text="关闭副灯", silent=True)
+        # kws_pc_control
+        case "打开电脑":
+            await speaker.play(text="正在唤醒电脑")
+            from wakeonlan import send_magic_packet
+            # TODO: fix
+            send_magic_packet("08BFB8A67CE2", ip_address="192.168.100.199")
+        case "切换屏幕":
+            await speaker.ask_xiaoai(text="我的电脑设置为三", silent=True)
+        case "按下空格":
+            await speaker.ask_xiaoai(text="我的电脑设置为七", silent=True)
 
 
 async def xiaoai_handler(speaker, text):
-    """
-    用于处理小爱同学唤醒后收到的二级指令，可以介入小爱的对话流
-    """
     match text:
         case "召唤小智":
             await _pause_xiaoai(speaker)
             await speaker.play(text="小智来了")
-            # 返回 True 唤醒小智 AI
-            # 更多功能可以在 xiaozhi_esp32_server 控制台的智能体中定义
-            # 还可以通过 MCP 实现更多种功能，未来可期
             return True
-        case "强制中断":
-            await _pause_xiaoai(speaker)
-            await speaker.set_playing(False)
-            await speaker.play(text="已强制中断")
 
 
 async def before_wakeup(speaker, text, source):
-    """
-    处理收到的用户消息，并决定是否唤醒小智 AI
-
-    - source: 唤醒来源
-        - 'kws': 关键字唤醒
-        - 'xiaoai': 小爱同学收到用户指令
-    """
-
     match source:
         case "kws":
-            # 如果是唤醒词就直接唤醒小智，跳过其他流程
-            if text in kws_wakeup:
-                await speaker.play(text="小智来了")
-                return True
             return await kws_handler(speaker, text)
         case "xiaoai":
             return await xiaoai_handler(speaker, text)
@@ -81,9 +117,9 @@ async def after_wakeup(speaker):
 APP_CONFIG = {
     "wakeup": {
         # 自定义唤醒词列表（英文字母要全小写）
-        "keywords": [*kws_wakeup, *kws_command],
+        "keywords": [*kws_wakeup, *kws_command, *kws_pc_control],
         # 静音多久后自动退出唤醒（秒）
-        "timeout": 10,
+        "timeout": 5,
         # 语音识别结果回调
         "before_wakeup": before_wakeup,
         # 退出唤醒时的提示语（设置为空可关闭）
@@ -91,19 +127,26 @@ APP_CONFIG = {
     },
     "vad": {
         # 录音音量增强倍数（小爱音箱录音音量较小，需要后期放大一下）
-        "boost": 10,
+        "boost": 130,
         # 语音检测阈值（0-1，越小越灵敏）
-        "threshold": 0.10,
+        "threshold": 0.35,
         # 最小语音时长（ms）
-        "min_speech_duration": 250,
+        "min_speech_duration": 1000,
         # 最小静默时长（ms）
-        "min_silence_duration": 500,
+        "min_silence_duration": 1000,
     },
+    # "xiaozhi": {
+    #     "OTA_URL": "https://2662r3426b.vicp.fun/xiaozhi/ota/",
+    #     "WEBSOCKET_URL": "wss://2662r3426b.vicp.fun/xiaozhi/v1/",
+    #     "WEBSOCKET_ACCESS_TOKEN": "",  #（可选）一般用不到这个值
+    #     "DEVICE_ID": "70:70:fc:05:83:fa",  #（可选）默认自动生成
+    #     "VERIFICATION_CODE": "477868",  # 首次登陆时，验证码会在这里更新
+    # },
     "xiaozhi": {
-        "OTA_URL": "https://2662r3426b.vicp.fun/xiaozhi/ota/",
-        "WEBSOCKET_URL": "wss://2662r3426b.vicp.fun/xiaozhi/v1/",
+        "OTA_URL": "",
+        "WEBSOCKET_URL": "",
         "WEBSOCKET_ACCESS_TOKEN": "",  #（可选）一般用不到这个值
         "DEVICE_ID": "70:70:fc:05:83:fa",  #（可选）默认自动生成
-        "VERIFICATION_CODE": "623519",  # 首次登陆时，验证码会在这里更新
+        "VERIFICATION_CODE": "",  # 首次登陆时，验证码会在这里更新
     },
 }

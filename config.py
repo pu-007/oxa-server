@@ -20,8 +20,6 @@ def ensure_dependencies(requirements: list[str]):
 
 ensure_dependencies([
     "wakeonlan",
-    # "mijiaAPI",
-    # "yt-dlp",
 ])
 
 kws_wakeup = ["小智小智"]
@@ -30,8 +28,9 @@ kws_command = [
     "切换电视", "请开空调", "请关空调", "请开风扇", "请关风扇", "切换主灯", "请开台灯", "请关台灯", "请关副灯",
     "请开副灯", "点亮外面", "熄灭外面", "全部关闭", "切换色温", "打开夜灯", "灯光全灭", "空调降温", "空调升温"
 ]
-kws_pc_control = ["打开电脑", "切换屏幕", "关闭电脑", "重启电脑", "按下空格", "联合启动", "联合关闭"]
-computer_mac = "08BFB8A67CE2"  # 电脑的MAC地址
+kws_pc_control = ["请开电脑", "切换屏幕", "请关电脑", "重启电脑", "按下空格", "联合启动", "联合关闭"]
+computer_mac = "08BFB8A67CE2"
+computer_ip = "192.168.100.193"
 
 
 async def _pause_xiaoai(speaker):
@@ -40,11 +39,10 @@ async def _pause_xiaoai(speaker):
 
 
 async def _wake_up_computer():
-    # TODO: fix invalid
     from wakeonlan import send_magic_packet
     await asyncio.to_thread(send_magic_packet,
                             computer_mac,
-                            ip_address="192.168.100.199")
+                            ip_address=computer_ip)
 
 
 async def kws_handler(speaker, text):
@@ -99,13 +97,13 @@ async def kws_handler(speaker, text):
         case "空调升温":
             await speaker.ask_xiaoai(text="空调温度升高", silent=True)
         # kws_pc_control
-        # TODO: 与 cut_in_xiaoai pc 控制端联动，直接读取 commands_table 并解析
-        case "打开电脑":
-            await speaker.play(text="正在唤醒电脑")
+        # TODO: 与 cut_in_xiaoai pc 控制端联动，直接读取 commands_table 并解析，或直接写一个 windows 客户端进行通信。
+        case "请开电脑":
+            await speaker.play(text="正在打开电脑")
             await _wake_up_computer()
         case "切换屏幕":
             await speaker.ask_xiaoai(text="我的电脑设置为三", silent=True)
-        case "关闭电脑":
+        case "请关电脑":
             await speaker.ask_xiaoai(text="关闭我的电脑", silent=True)
         case "重启电脑":
             await speaker.ask_xiaoai(text="我的电脑设置为一", silent=True)
@@ -120,16 +118,6 @@ async def kws_handler(speaker, text):
 
 
 async def xiaoai_handler(speaker, text):
-    # 暂时用 xiaomuisc 替代该功能
-    # # 新增case：处理“智能音乐”开头的指令
-    # if text.startswith("智能音乐"):
-    #     # 提取“智能音乐”后面的文本作为音乐名称，并去除前后空格
-    #     music_name = text[len("智能音乐"):].strip()
-    #     if music_name:  # 确保提取的音乐名称不为空
-    #         await _pause_xiaoai(speaker)
-    #         await xiaomusic_handler(speaker, music_name)
-    #         return True  # 表示指令已成功处理
-
     match text:
         case "召唤小智":
             await _pause_xiaoai(speaker)
@@ -168,9 +156,9 @@ APP_CONFIG = {
     },
     "vad": {
         # 录音音量增强倍数（小爱音箱录音音量较小，需要后期放大一下）
-        "boost": 130,
+        "boost": 150,
         # 语音检测阈值（0-1，越小越灵敏）
-        "threshold": 0.35,
+        "threshold": 0.30,
         # 最小语音时长（ms）
         "min_speech_duration": 1000,
         # 最小静默时长（ms）

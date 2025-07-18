@@ -1,9 +1,77 @@
 import asyncio
 import os
 import subprocess
+from typing import Dict, List, Callable, Awaitable
+
+# --- 命令映射表 (数据驱动核心) ---
+KWS_WAKEUP = ["小智小智"]
 
 
-def ensure_dependencies(requirements: list[str]):
+async def wake_up_computer(_):
+    """
+    发送网络唤醒 (Wake-on-LAN) 魔法包来启动电脑。
+    """
+    _ensure_dependencies(["wakeonlan"])
+
+    computer_mac = "08BFB8A67CE2"
+    subnet_broadcast_ip = "192.168.100.255"
+
+    from wakeonlan import send_magic_packet
+
+    await asyncio.to_thread(send_magic_packet,
+                            computer_mac,
+                            ip_address=subnet_broadcast_ip)
+
+
+COMMAND_MAP: Dict[str, List[str | Callable | Awaitable]] = {
+    # 小爱原生指令
+    "切换电视": ["打开电视"],
+    "请开空调": ["打开空调"],
+    "请关空调": ["关闭空调"],
+    "空调升速": ["空调风速升高"],
+    "空调降速": ["空调风速降低"],
+    "请开风扇": ["打开风扇"],
+    "请关风扇": ["关闭风扇"],
+    "切换主灯": ["打开主灯"],
+    "请开台灯": ["打开台灯"],
+    "请关台灯": ["关闭台灯"],
+    "请关副灯": ["关闭副灯"],
+    "请开副灯": ["打开副灯"],
+    "切换色温": ["色温分段"],
+    "打开夜灯": ["昏暗模式"],
+    "空调降温": ["空调温度降低"],
+    "空调升温": ["空调温度升高"],
+    "风扇定时": ["定时风扇"],
+
+    # 组合指令
+    "点亮外面": ["打开台灯", "打开副灯"],
+    "熄灭外面": ["关闭台灯", "关闭副灯"],
+    "关灯空调": ["关闭主灯", "关闭台灯", "关闭副灯", "关闭空调"],
+    "灯光全灭": ["关闭主灯", "关闭台灯", "关闭副灯"],
+    "全部关闭": ["关闭空调", "关闭风扇", "关闭主灯", "关闭电视", "关闭我的电脑", "关闭台灯", "关闭副灯"],
+
+    # PC 控制 & 特殊指令
+    "请开电脑": [wake_up_computer],
+    "切换屏幕": ["我的电脑设置为三"],
+    "请关电脑": ["关闭我的电脑"],
+    "重启电脑": ["我的电脑设置为一"],
+    "测试电脑": ["我的电脑设置为七"],  # 按下空格
+
+    # 混合指令
+    "联合启动": [wake_up_computer, "打开电视"],
+    "联合关闭": ["关闭我的电脑", "关闭电视"],
+}
+
+
+# --- 辅助函数 ---
+async def _pause_xiaoai(speaker):
+    """中断小爱并等待服务重启。"""
+    await speaker.abort_xiaoai()
+    await asyncio.sleep(2)
+
+
+def _ensure_dependencies(requirements: list[str]):
+    """检查并安装缺失的 Python 依赖包。"""
     import importlib.util
     missing_packages = [
         pkg for pkg in requirements if not importlib.util.find_spec(pkg)
@@ -12,207 +80,82 @@ def ensure_dependencies(requirements: list[str]):
     if not missing_packages:
         return
 
+    print(f"检测到缺失的依赖: {missing_packages}，正在尝试安装...")
+    # 假设脚本在一个虚拟环境目录的父目录中运行
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    python = os.path.join(script_dir, '.venv', "bin", 'python')
-    subprocess.run([python, "-m", "ensurepip"])
-    subprocess.run([python, "-m", "pip", "install", *missing_packages])
+    python_executable = os.path.join(script_dir, '.venv', "bin", 'python')
+    if not os.path.exists(python_executable):
+        # 如果找不到虚拟环境的 python，就使用系统默认的 python
+        import sys
+        python_executable = sys.executable
+        print(f"未找到虚拟环境，使用系统 Python: {python_executable}")
+
+    subprocess.run([python_executable, "-m", "ensurepip"], check=False)
+    subprocess.run(
+        [python_executable, "-m", "pip", "install", *missing_packages],
+        check=True)
+    print("依赖安装完成。")
 
 
-ensure_dependencies([
-    "wakeonlan",
-])
+# --- 事件处理器 ---
+async def _kws_handler(speaker, text):
+    """统一处理所有自定义关键词命令。"""
+    actions = COMMAND_MAP[text]
+    for action in actions:
+        if isinstance(action, str):
+            await speaker.ask_xiaoai(text=action, silent=True)
+        elif callable(action):
+            await action(speaker)
+        await asyncio.sleep(0.2)  # 防止指令发送过快
 
-kws_wakeup = ["小智小智"]
-# 将“打开xx”和“关闭xx”等指令统一修改为“请开/关xx”
-kws_command = [
-    "切换电视",
-    "请开空调",
-    "请关空调",
-    "请开风扇",
-    "请关风扇",
-    "切换主灯",
-    "请开台灯",
-    "请关台灯",
-    "请关副灯",
-    "请开副灯",
-    "点亮外面",
-    "熄灭外面",
-    "全部关闭",
-    "切换色温",
-    "打开夜灯",
-    "灯光全灭",
-    "空调降温",
-    "空调升温",
-    "空调升速",
-    "空调降速",
-    "灯灭调关",
-    "风扇定时",
-]
-kws_pc_control = [
-    "请开电脑",
-    "切换屏幕",
-    "请关电脑",
-    "重启电脑",
-    "按下空格",
-    "联合启动",
-    "联合关闭",
-]
-_computer_mac = "08BFB8A67CE2"
-_computer_ip = "192.168.100.193"
+    await speaker.play(text="已执行")
 
 
-async def _pause_xiaoai(speaker):
-    await speaker.abort_xiaoai()
-    await asyncio.sleep(2)
+async def _xiaoai_handler(speaker, text):
+    """处理来自小爱原生对话的特定指令。"""
+    if text == "召唤小智":
+        await _pause_xiaoai(speaker)
+        await speaker.play(text="小智来了")
+        return True
 
 
-async def _wake_up_computer(computer_mac, computer_ip):
-    from wakeonlan import send_magic_packet
-    await asyncio.to_thread(send_magic_packet,
-                            computer_mac,
-                            ip_address=computer_ip)
-
-
-async def kws_handler(speaker, text):
-    match text:
-    # kws_command
-        case "切换电视":
-            # 关闭/打开电视
-            await speaker.ask_xiaoai(text="关闭电视", silent=True)
-        case "请开空调":
-            await speaker.ask_xiaoai(text="打开空调", silent=True)
-        case "请关空调":
-            await speaker.ask_xiaoai(text="关闭空调", silent=True)
-        case "空调升速":
-            await speaker.ask_xiaoai(text="空调风速升高", silent=True)
-        case "空调降速":
-            await speaker.ask_xiaoai(text="空调风速降低", silent=True)
-        case "请开风扇":
-            await speaker.ask_xiaoai(text="打开风扇", silent=True)
-        case "请关风扇":
-            await speaker.ask_xiaoai(text="关闭风扇", silent=True)
-        case "切换主灯":
-            # 关闭/打开主灯
-            await speaker.ask_xiaoai(text="关闭主灯", silent=True)
-        case "请开台灯":
-            await speaker.ask_xiaoai(text="打开台灯", silent=True)
-        case "请关台灯":
-            await speaker.ask_xiaoai(text="关闭台灯", silent=True)
-        case "请关副灯":
-            await speaker.ask_xiaoai(text="关闭副灯", silent=True)
-        case "请开副灯":
-            await speaker.ask_xiaoai(text="打开副灯", silent=True)
-        case "点亮外面":
-            await speaker.ask_xiaoai(text="打开台灯", silent=True)
-            await speaker.ask_xiaoai(text="打开副灯", silent=True)
-        case "熄灭外面":
-            await speaker.ask_xiaoai(text="关闭台灯", silent=True)
-            await speaker.ask_xiaoai(text="关闭副灯", silent=True)
-        case "全部关闭":
-            await speaker.ask_xiaoai(text="关闭空调", silent=True)
-            await speaker.ask_xiaoai(text="关闭风扇", silent=True)
-            await speaker.ask_xiaoai(text="关闭主灯", silent=True)
-            await speaker.ask_xiaoai(text="关闭电视", silent=True)
-            await speaker.ask_xiaoai(text="关闭我的电脑", silent=True)
-            await speaker.ask_xiaoai(text="关闭台灯", silent=True)
-            await speaker.ask_xiaoai(text="关闭副灯", silent=True)
-        case "灯灭调关":
-            await speaker.ask_xiaoai(text="关闭主灯", silent=True)
-            await speaker.ask_xiaoai(text="关闭台灯", silent=True)
-            await speaker.ask_xiaoai(text="关闭副灯", silent=True)
-            await speaker.ask_xiaoai(text="关闭空调", silent=True)
-        case "灯光全灭":
-            await speaker.ask_xiaoai(text="关闭主灯", silent=True)
-            await speaker.ask_xiaoai(text="关闭台灯", silent=True)
-            await speaker.ask_xiaoai(text="关闭副灯", silent=True)
-        case "切换色温":
-            await speaker.ask_xiaoai(text="色温分段", silent=True)
-        case "打开夜灯":
-            await speaker.ask_xiaoai(text="昏暗模式", silent=True)
-        case "空调降温":
-            await speaker.ask_xiaoai(text="空调温度降低", silent=True)
-        case "空调升温":
-            await speaker.ask_xiaoai(text="空调温度升高", silent=True)
-        # kws_pc_control
-        # TODO: 与 cut_in_xiaoai pc 控制端联动，直接读取 commands_table 并解析，或直接写一个 windows 客户端进行通信。
-        case "请开电脑":
-            await speaker.play(text="正在打开电脑")
-            await _wake_up_computer(_computer_mac, _computer_ip)
-        case "切换屏幕":
-            await speaker.ask_xiaoai(text="我的电脑设置为三", silent=True)
-        case "请关电脑":
-            await speaker.ask_xiaoai(text="关闭我的电脑", silent=True)
-        case "重启电脑":
-            await speaker.ask_xiaoai(text="我的电脑设置为一", silent=True)
-        case "按下空格":
-            await speaker.ask_xiaoai(text="我的电脑设置为七", silent=True)
-        case "联合启动":
-            await _wake_up_computer(_computer_mac, _computer_ip)
-            await speaker.ask_xiaoai(text="打开电视", silent=True)
-        case "联合关闭":
-            await speaker.ask_xiaoai(text="关闭我的电脑", silent=True)
-            await speaker.ask_xiaoai(text="关闭电视", silent=True)
-
-
-async def xiaoai_handler(speaker, text):
-    match text:
-        case "召唤小智":
-            await _pause_xiaoai(speaker)
+async def _before_wakeup(speaker, text, source):
+    """在进入唤醒状态前的主回调函数。"""
+    if source == "kws":
+        if text in KWS_WAKEUP:
             await speaker.play(text="小智来了")
             return True
+        return await _kws_handler(speaker, text)
+    elif source == "xiaoai":
+        return await _xiaoai_handler(speaker, text)
 
 
-async def before_wakeup(speaker, text, source):
-    match source:
-        case "kws":
-            if text in kws_wakeup:
-                await speaker.play(text="小智来了")
-                return True
-            return await kws_handler(speaker, text)
-        case "xiaoai":
-            return await xiaoai_handler(speaker, text)
-
-
-async def after_wakeup(speaker):
-    """
-    退出唤醒状态
-    """
+async def _after_wakeup(speaker):
+    """退出唤醒状态时调用。"""
     await speaker.play(text="主人再见")
 
 
+# --- APP 总配置 ---
+ALL_COMMAND_KWS = list(COMMAND_MAP.keys())
+
 APP_CONFIG = {
     "wakeup": {
-        # 自定义唤醒词列表（英文字母要全小写）
-        "keywords": [*kws_wakeup, *kws_command, *kws_pc_control],
-        # 静音多久后自动退出唤醒（秒）
+        "keywords": [*KWS_WAKEUP, *ALL_COMMAND_KWS],
         "timeout": 5,
-        # 语音识别结果回调
-        "before_wakeup": before_wakeup,
-        # 退出唤醒时的提示语（设置为空可关闭）
-        "after_wakeup": after_wakeup,
+        "before_wakeup": _before_wakeup,
+        "after_wakeup": _after_wakeup,
     },
     "vad": {
-        # 录音音量增强倍数（小爱音箱录音音量较小，需要后期放大一下）
-        "boost": 150,
-        # 语音检测阈值（0-1，越小越灵敏）
-        "threshold": 0.30,
-        # 最小语音时长（ms）
+        "boost": 100,
+        "threshold": 0.1,
         "min_speech_duration": 1000,
-        # 最小静默时长（ms）
         "min_silence_duration": 1000,
     },
     "xiaozhi": {
         "OTA_URL": "https://2662r3426b.vicp.fun/xiaozhi/ota/",
         "WEBSOCKET_URL": "wss://2662r3426b.vicp.fun/xiaozhi/v1/",
-        "WEBSOCKET_ACCESS_TOKEN": "",  #（可选）一般用不到这个值
-        "DEVICE_ID": "70:70:fc:05:83:fa",  #（可选）默认自动生成
-        "VERIFICATION_CODE": "477868",  # 首次登陆时，验证码会在这里更新
+        "WEBSOCKET_ACCESS_TOKEN": "",
+        "DEVICE_ID": "70:70:fc:05:83:fa",
+        "VERIFICATION_CODE": "477868",
     },
-    # "xiaozhi": {
-    #     "OTA_URL": "",
-    #     "WEBSOCKET_URL": "",
-    #     "WEBSOCKET_ACCESS_TOKEN": "",  #（可选）一般用不到这个值
-    #     "DEVICE_ID": "70:70:fc:05:83:fa",  #（可选）默认自动生成
-    #     "VERIFICATION_CODE": "",  # 首次登陆时，验证码会在这里更新
-    # },
 }

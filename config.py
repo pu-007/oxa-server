@@ -25,12 +25,40 @@ ensure_dependencies([
 kws_wakeup = ["小智小智"]
 # 将“打开xx”和“关闭xx”等指令统一修改为“请开/关xx”
 kws_command = [
-    "切换电视", "请开空调", "请关空调", "请开风扇", "请关风扇", "切换主灯", "请开台灯", "请关台灯", "请关副灯",
-    "请开副灯", "点亮外面", "熄灭外面", "全部关闭", "切换色温", "打开夜灯", "灯光全灭", "空调降温", "空调升温"
+    "切换电视",
+    "请开空调",
+    "请关空调",
+    "请开风扇",
+    "请关风扇",
+    "切换主灯",
+    "请开台灯",
+    "请关台灯",
+    "请关副灯",
+    "请开副灯",
+    "点亮外面",
+    "熄灭外面",
+    "全部关闭",
+    "切换色温",
+    "打开夜灯",
+    "灯光全灭",
+    "空调降温",
+    "空调升温",
+    "空调升速",
+    "空调降速",
+    "灯灭调关",
+    "风扇定时",
 ]
-kws_pc_control = ["请开电脑", "切换屏幕", "请关电脑", "重启电脑", "按下空格", "联合启动", "联合关闭"]
-computer_mac = "08BFB8A67CE2"
-computer_ip = "192.168.100.193"
+kws_pc_control = [
+    "请开电脑",
+    "切换屏幕",
+    "请关电脑",
+    "重启电脑",
+    "按下空格",
+    "联合启动",
+    "联合关闭",
+]
+_computer_mac = "08BFB8A67CE2"
+_computer_ip = "192.168.100.193"
 
 
 async def _pause_xiaoai(speaker):
@@ -38,7 +66,7 @@ async def _pause_xiaoai(speaker):
     await asyncio.sleep(2)
 
 
-async def _wake_up_computer():
+async def _wake_up_computer(computer_mac, computer_ip):
     from wakeonlan import send_magic_packet
     await asyncio.to_thread(send_magic_packet,
                             computer_mac,
@@ -55,6 +83,10 @@ async def kws_handler(speaker, text):
             await speaker.ask_xiaoai(text="打开空调", silent=True)
         case "请关空调":
             await speaker.ask_xiaoai(text="关闭空调", silent=True)
+        case "空调升速":
+            await speaker.ask_xiaoai(text="空调风速升高", silent=True)
+        case "空调降速":
+            await speaker.ask_xiaoai(text="空调风速降低", silent=True)
         case "请开风扇":
             await speaker.ask_xiaoai(text="打开风扇", silent=True)
         case "请关风扇":
@@ -84,6 +116,11 @@ async def kws_handler(speaker, text):
             await speaker.ask_xiaoai(text="关闭我的电脑", silent=True)
             await speaker.ask_xiaoai(text="关闭台灯", silent=True)
             await speaker.ask_xiaoai(text="关闭副灯", silent=True)
+        case "灯灭调关":
+            await speaker.ask_xiaoai(text="关闭主灯", silent=True)
+            await speaker.ask_xiaoai(text="关闭台灯", silent=True)
+            await speaker.ask_xiaoai(text="关闭副灯", silent=True)
+            await speaker.ask_xiaoai(text="关闭空调", silent=True)
         case "灯光全灭":
             await speaker.ask_xiaoai(text="关闭主灯", silent=True)
             await speaker.ask_xiaoai(text="关闭台灯", silent=True)
@@ -100,7 +137,7 @@ async def kws_handler(speaker, text):
         # TODO: 与 cut_in_xiaoai pc 控制端联动，直接读取 commands_table 并解析，或直接写一个 windows 客户端进行通信。
         case "请开电脑":
             await speaker.play(text="正在打开电脑")
-            await _wake_up_computer()
+            await _wake_up_computer(_computer_mac, _computer_ip)
         case "切换屏幕":
             await speaker.ask_xiaoai(text="我的电脑设置为三", silent=True)
         case "请关电脑":
@@ -110,7 +147,7 @@ async def kws_handler(speaker, text):
         case "按下空格":
             await speaker.ask_xiaoai(text="我的电脑设置为七", silent=True)
         case "联合启动":
-            await _wake_up_computer()
+            await _wake_up_computer(_computer_mac, _computer_ip)
             await speaker.ask_xiaoai(text="打开电视", silent=True)
         case "联合关闭":
             await speaker.ask_xiaoai(text="关闭我的电脑", silent=True)

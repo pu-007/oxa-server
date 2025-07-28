@@ -69,6 +69,89 @@
 通过这种方式，你既可以享受到 `open-xiaoai` 的强大基础功能，又能利用本项目的 `config.py` 轻松实现各种高级定制。
 
 
+### ⚙️ 配置说明
+
+`config.py` 文件是本项目的核心配置文件，通过修改其中的变量和字典，你可以高度定制小爱同学的行为。
+
+#### `KWS_WAKEUP`
+
+*   **作用**: 定义用于唤醒小智的关键词列表。当小爱同学识别到这些词语时，会触发小智的唤醒逻辑。
+*   **配置方式**: 修改列表中的字符串，例如 `KWS_WAKEUP = ["小智小智", "你好小智"]`。
+
+#### `COMMAND_MAP`
+
+*   **作用**: 这是最核心的指令映射表。它将你对小爱同学说出的自定义指令（键）映射到一个或多个实际执行的动作（值）。动作可以是小爱同学的原生指令字符串，也可以是自定义的 Python 异步函数。
+*   **配置方式**:
+    *   **原生指令映射**: `"你的自定义指令": ["小爱原生指令"]`。例如：`"切换电视": ["打开电视"]`。
+    *   **组合指令**: `"你的组合指令": ["小爱原生指令1", "小爱原生指令2", ...]`。例如：`"点亮外面": ["打开台灯", "打开副灯"]`。
+    *   **Python 函数调用**: `"你的自定义指令": [你的异步函数名]`。例如：`"请开电脑": [wake_up_computer]`。
+    *   **混合指令**: `"你的混合指令": [你的异步函数名, "小爱原生指令"]`。例如：`"联合启动": [wake_up_computer, "打开电视"]`。
+    *   `wake_up_computer` 是一个示例函数，用于发送网络唤醒包。你可以根据需要编写自己的 Python 函数。
+
+#### `APP_CONFIG`
+
+这是一个总的应用程序配置字典，包含了 `wakeup`、`vad` 和 `xiaozhi` 三个主要部分。
+
+##### `APP_CONFIG["wakeup"]`
+
+*   **作用**: 控制小智的唤醒行为。
+*   **配置项**:
+    *   `keywords`: 包含所有触发小智的关键词，通常会自动包含 `KWS_WAKEUP` 和 `COMMAND_MAP` 中的所有键。一般无需手动修改。
+    *   `timeout`: 唤醒状态的超时时间（秒）。小智在被唤醒后，如果在此时间内没有新的指令，将自动退出唤醒状态。
+    *   `before_wakeup`: 进入唤醒状态前执行的回调函数。
+    *   `after_wakeup`: 退出唤醒状态时执行的回调函数。
+
+##### `APP_CONFIG["vad"]`
+
+*   **作用**: 配置语音活动检测（VAD）参数，影响小智对语音的识别和断句。
+*   **配置项**:
+    *   `boost`: VAD 增益，影响语音识别的灵敏度。
+    *   `threshold`: VAD 阈值，用于判断是否有语音活动。
+    *   `min_speech_duration`: 最小语音持续时间（毫秒），低于此时间可能被认为是噪音。
+    *   `min_silence_duration`: 最小静音持续时间（毫秒），用于判断一句话是否结束。
+
+##### `APP_CONFIG["xiaozhi"]`
+
+*   **作用**: 配置与 `open-xiaoai` `xiaozhi` 服务相关的连接参数。
+*   **配置项**:
+    *   `OTA_URL`: OTA (Over-The-Air) 更新服务的 URL。
+    *   `WEBSOCKET_URL`: WebSocket 服务器的 URL，用于与小爱同学服务通信。
+    *   `WEBSOCKET_ACCESS_TOKEN`: 连接 WebSocket 服务器所需的访问令牌。**重要：请务必替换为你的真实 Token。**
+    *   `DEVICE_ID`: 你的小爱同学设备的唯一 ID。**重要：请务必替换为你的真实设备 ID。**
+    *   `VERIFICATION_CODE`: 用于设备验证的验证码。
+
+### 🔌 事件处理器 (Handler Functions)
+
+`config.py` 中定义了多个异步函数，它们作为事件处理器，在小爱同学的不同状态或接收到特定指令时被调用。
+
+#### `_kws_handler(speaker, text)`
+
+*   **作用**: 统一处理所有自定义关键词命令。当小爱同学识别到 `COMMAND_MAP` 中定义的关键词时，此函数会被调用，并根据映射执行相应的动作（发送原生指令或调用自定义 Python 函数）。
+*   **参数**:
+    *   `speaker`: `Speaker` 对象，用于与小爱同学交互（如发送指令、播放语音）。
+    *   `text`: 小爱同学识别到的关键词文本。
+
+#### `_xiaoai_handler(speaker, text)`
+
+*   **作用**: 处理来自小爱原生对话的特定指令。例如，当你说出 "召唤小智" 时，此函数会中断小爱同学的当前对话，并让小智接管。
+*   **参数**:
+    *   `speaker`: `Speaker` 对象。
+    *   `text`: 小爱同学识别到的对话文本。
+
+#### `_before_wakeup(speaker, text, source)`
+
+*   **作用**: 在小智进入唤醒状态前的主回调函数。它会根据指令来源 (`kws` 或 `xiaoai`) 分发到 `_kws_handler` 或 `_xiaoai_handler` 进行处理。
+*   **参数**:
+    *   `speaker`: `Speaker` 对象。
+    *   `text`: 识别到的文本。
+    *   `source`: 指令来源，可以是 `"kws"` (关键词唤醒) 或 `"xiaoai"` (小爱原生对话)。
+
+#### `_after_wakeup(speaker)`
+
+*   **作用**: 当小智退出唤醒状态时调用。通常用于播放一个结束语。
+*   **参数**:
+    *   `speaker`: `Speaker` 对象。
+
 ### 🔗 关联项目
 
 - **[open-xiaoai](https://github.com/idootop/open-xiaoai)**: 本项目的基础，一个功能强大的小米智能音箱开放平台项目。
@@ -139,6 +222,140 @@ The core of this project is to provide a more powerful `config.py`.
 
 This way, you can enjoy the powerful base functionality of `open-xiaoai` while easily implementing various advanced customizations using this project's `config.py`.
 
+
+### ⚙️ Configuration Explanation
+
+The `config.py` file is the core configuration file for this project. By modifying its variables and dictionaries, you can highly customize the behavior of Xiaoai Speaker.
+
+#### `KWS_WAKEUP`
+
+*   **Purpose**: Defines a list of keywords used to wake up Xiaozhi. When Xiaoai Speaker recognizes these words, it triggers Xiaozhi's wake-up logic.
+*   **Configuration**: Modify the strings in the list, for example `KWS_WAKEUP = ["xiaozhi xiaozhi", "hello xiaozhi"]`.
+
+#### `COMMAND_MAP`
+
+*   **Purpose**: This is the most crucial command mapping table. It maps your custom spoken commands (keys) to one or more actions (values) to be executed. Actions can be native Xiaoai Speaker commands (strings) or custom Python asynchronous functions.
+*   **Configuration**:
+    *   **Native Command Mapping**: `"Your Custom Command": ["Native Xiaoai Command"]`. For example: `"switch TV": ["turn on TV"]`.
+    *   **Combined Commands**: `"Your Combined Command": ["Native Xiaoai Command 1", "Native Xiaoai Command 2", ...]`. For example: `"light up outside": ["turn on desk lamp", "turn on auxiliary light"]`.
+    *   **Python Function Calls**: `"Your Custom Command": [your_async_function_name]`. For example: `"turn on PC": [wake_up_computer]`.
+    *   **Mixed Commands**: `"Your Mixed Command": [your_async_function_name, "Native Xiaoai Command"]`. For example: `"joint start": [wake_up_computer, "turn on TV"]`.
+    *   `wake_up_computer` is an example function for sending Wake-on-LAN packets. You can write your own Python functions as needed.
+
+#### `APP_CONFIG`
+
+This is a general application configuration dictionary, containing three main sections: `wakeup`, `vad`, and `xiaozhi`.
+
+##### `APP_CONFIG["wakeup"]`
+
+*   **Purpose**: Controls Xiaozhi's wake-up behavior.
+*   **Configuration Items**:
+    *   `keywords`: Contains all keywords that trigger Xiaozhi, usually automatically including `KWS_WAKEUP` and all keys from `COMMAND_MAP`. Generally no manual modification is needed.
+    *   `timeout`: The timeout duration (in seconds) for the awakened state. If Xiaozhi receives no new commands within this time after being awakened, it will automatically exit the awakened state.
+    *   `before_wakeup`: A callback function executed before entering the awakened state.
+    *   `after_wakeup`: A callback function executed when exiting the awakened state.
+
+##### `APP_CONFIG["vad"]`
+
+*   **Purpose**: Configures Voice Activity Detection (VAD) parameters, affecting Xiaozhi's speech recognition and segmentation.
+*   **Configuration Items**:
+    *   `boost`: VAD gain, affecting the sensitivity of speech recognition.
+    *   `threshold`: VAD threshold, used to determine if there is voice activity.
+    *   `min_speech_duration`: Minimum speech duration (milliseconds); durations below this may be considered noise.
+    *   `min_silence_duration`: Minimum silence duration (milliseconds), used to determine if a sentence has ended.
+
+##### `APP_CONFIG["xiaozhi"]`
+
+*   **Purpose**: Configures connection parameters related to the `open-xiaoai` `xiaozhi` service.
+*   **Configuration Items**:
+    *   `OTA_URL`: The URL for the OTA (Over-The-Air) update service.
+    *   `WEBSOCKET_URL`: The URL of the WebSocket server for communication with the Xiaoai Speaker service.
+    *   `WEBSOCKET_ACCESS_TOKEN`: The access token required to connect to the WebSocket server. **Important: Please replace this with your actual Token.**
+    *   `DEVICE_ID`: The unique ID of your Xiaoai Speaker device. **Important: Please replace this with your actual Device ID.**
+    *   `VERIFICATION_CODE`: The verification code used for device authentication.
+
+### ⚙️ Configuration Explanation
+
+The `config.py` file is the core configuration file for this project. By modifying its variables and dictionaries, you can highly customize the behavior of Xiaoai Speaker.
+
+#### `KWS_WAKEUP`
+
+*   **Purpose**: Defines a list of keywords used to wake up Xiaozhi. When Xiaoai Speaker recognizes these words, it triggers Xiaozhi's wake-up logic.
+*   **Configuration**: Modify the strings in the list, for example `KWS_WAKEUP = ["xiaozhi xiaozhi", "hello xiaozhi"]`.
+
+#### `COMMAND_MAP`
+
+*   **Purpose**: This is the most crucial command mapping table. It maps your custom spoken commands (keys) to one or more actions (values) to be executed. Actions can be native Xiaoai Speaker commands (strings) or custom Python asynchronous functions.
+*   **Configuration**:
+    *   **Native Command Mapping**: `"Your Custom Command": ["Native Xiaoai Command"]`. For example: `"switch TV": ["turn on TV"]`.
+    *   **Combined Commands**: `"Your Combined Command": ["Native Xiaoai Command 1", "Native Xiaoai Command 2", ...]`. For example: `"light up outside": ["turn on desk lamp", "turn on auxiliary light"]`.
+    *   **Python Function Calls**: `"Your Custom Command": [your_async_function_name]`. For example: `"turn on PC": [wake_up_computer]`.
+    *   **Mixed Commands**: `"Your Mixed Command": [your_async_function_name, "Native Xiaoai Command"]`. For example: `"joint start": [wake_up_computer, "turn on TV"]`.
+    *   `wake_up_computer` is an example function for sending Wake-on-LAN packets. You can write your own Python functions as needed.
+
+#### `APP_CONFIG`
+
+This is a general application configuration dictionary, containing three main sections: `wakeup`, `vad`, and `xiaozhi`.
+
+##### `APP_CONFIG["wakeup"]`
+
+*   **Purpose**: Controls Xiaozhi's wake-up behavior.
+*   **Configuration Items**:
+    *   `keywords`: Contains all keywords that trigger Xiaozhi, usually automatically including `KWS_WAKEUP` and all keys from `COMMAND_MAP`. Generally no manual modification is needed.
+    *   `timeout`: The timeout duration (in seconds) for the awakened state. If Xiaozhi receives no new commands within this time after being awakened, it will automatically exit the awakened state.
+    *   `before_wakeup`: A callback function executed before entering the awakened state.
+    *   `after_wakeup`: A callback function executed when exiting the awakened state.
+
+##### `APP_CONFIG["vad"]`
+
+*   **Purpose**: Configures Voice Activity Detection (VAD) parameters, affecting Xiaozhi's speech recognition and segmentation.
+*   **Configuration Items**:
+    *   `boost`: VAD gain, affecting the sensitivity of speech recognition.
+    *   `threshold`: VAD threshold, used to determine if there is voice activity.
+    *   `min_speech_duration`: Minimum speech duration (milliseconds); durations below this may be considered noise.
+    *   `min_silence_duration`: Minimum silence duration (milliseconds), used to determine if a sentence has ended.
+
+##### `APP_CONFIG["xiaozhi"]`
+
+*   **Purpose**: Configures connection parameters related to the `open-xiaoai` `xiaozhi` service.
+*   **Configuration Items**:
+    *   `OTA_URL`: The URL for the OTA (Over-The-Air) update service.
+    *   `WEBSOCKET_URL`: The URL of the WebSocket server for communication with the Xiaoai Speaker service.
+    *   `WEBSOCKET_ACCESS_TOKEN`: The access token required to connect to the WebSocket server. **Important: Please replace this with your actual Token.**
+    *   `DEVICE_ID`: The unique ID of your Xiaoai Speaker device. **Important: Please replace this with your actual Device ID.**
+    *   `VERIFICATION_CODE`: The verification code used for device authentication.
+
+### 🔌 Event Handlers (Handler Functions)
+
+`config.py` defines several asynchronous functions that act as event handlers, called when Xiaoai Speaker is in different states or receives specific commands.
+
+#### `_kws_handler(speaker, text)`
+
+*   **Purpose**: Uniformly handles all custom keyword commands. When Xiaoai Speaker recognizes a keyword defined in `COMMAND_MAP`, this function is called and executes the corresponding action (sending a native command or calling a custom Python function) based on the mapping.
+*   **Parameters**:
+    *   `speaker`: The `Speaker` object, used to interact with Xiaoai Speaker (e.g., sending commands, playing audio).
+    *   `text`: The keyword text recognized by Xiaoai Speaker.
+
+#### `_xiaoai_handler(speaker, text)`
+
+*   **Purpose**: Handles specific commands from Xiaoai's native dialogue. For example, when you say "summon Xiaozhi", this function will interrupt Xiaoai Speaker's current dialogue and let Xiaozhi take over.
+*   **Parameters**:
+    *   `speaker`: The `Speaker` object.
+    *   `text`: The dialogue text recognized by Xiaoai Speaker.
+
+#### `_before_wakeup(speaker, text, source)`
+
+*   **Purpose**: The main callback function executed before Xiaozhi enters the awakened state. It dispatches to `_kws_handler` or `_xiaoai_handler` for processing based on the command source (`kws` or `xiaoai`).
+*   **Parameters**:
+    *   `speaker`: The `Speaker` object.
+    *   `text`: The recognized text.
+    *   `source`: The command source, which can be `"kws"` (keyword wake-up) or `"xiaoai"` (Xiaoai native dialogue).
+
+#### `_after_wakeup(speaker)`
+
+*   **Purpose**: Called when Xiaozhi exits the awakened state. Typically used to play a closing remark.
+*   **Parameters**:
+    *   `speaker`: The `Speaker` object.
 
 ### 🔗 Related Projects
 

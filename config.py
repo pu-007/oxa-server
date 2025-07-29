@@ -10,6 +10,8 @@ import os
 import subprocess
 from typing import Dict, List, Callable, Awaitable
 
+from oxa_ext.speaker_protocol import SpeakerProtocol
+
 # ==============================================================================
 # 主要应用配置 (Primary Application Configuration)
 # ==============================================================================
@@ -18,7 +20,7 @@ from typing import Dict, List, Callable, Awaitable
 # --- 语音活动检测 (VAD) 配置 ---
 # 用于判断用户是否开始或停止说话。
 VAD_CONFIG = {
-    "boost": 100,  # 音频增益
+    "boost": 200,  # 音频增益
     "threshold": 0.1,  # 语音检测阈值
     "min_speech_duration": 1000,  # 最短语音时长 (毫秒)
     "min_silence_duration": 1000,  # 语音结束后最短静音时长 (毫秒)
@@ -31,13 +33,15 @@ XIAOZHI_CONFIG = {
     "WEBSOCKET_URL": "wss://2662r3426b.vicp.fun/xiaozhi/v1/",  # WebSocket 通信地址
     "WEBSOCKET_ACCESS_TOKEN": "",  # WebSocket 访问令牌 (如有)
     "DEVICE_ID": "70:70:fc:05:83:fa",  # 您的设备唯一ID (MAC地址)
-    "VERIFICATION_CODE": "477868",  # 设备验证码
+    "VERIFICATION_CODE": "699244",  # 设备验证码
 }
-
 
 # ==============================================================================
 # 自定义功能实现 (Custom Function Implementations)
 # ==============================================================================
+Action = Callable[[SpeakerProtocol], Awaitable[None]]
+
+
 # 在这里定义您的自定义异步函数，例如网络唤醒、API调用等。
 async def wake_up_computer(_):
     """
@@ -62,9 +66,11 @@ async def wake_up_computer(_):
 # --- 模式一：直接VAD唤醒指令 ---
 # 无需说“小爱同学”，直接说出这些词即可触发。
 DIRECT_VAD_WAKEUP_KEYWORDS = ["小智小智"]
-DIRECT_VAD_COMMAND_MAP: Dict[str, List[str | Callable | Awaitable]] = {
+DIRECT_VAD_COMMAND_MAP: Dict[str, List[str | Action]] = {
     ## 小爱同学原生指令
     "切换电视": ["打开电视"],
+    "请开电视": ["打开电视"],
+    "请关电视": ["关闭电视"],
     "请开空调": ["打开空调"],
     "请关空调": ["关闭空调"],
     "空调升速": ["空调风速升高"],
@@ -72,8 +78,8 @@ DIRECT_VAD_COMMAND_MAP: Dict[str, List[str | Callable | Awaitable]] = {
     "请开风扇": ["打开风扇"],
     "请关风扇": ["关闭风扇"],
     "切换主灯": ["打开主灯"],
-    "请开主灯": ["打开主灯"],
-    "请关主灯": ["关闭主灯"],
+    "请开大灯": ["打开主灯"],
+    "请关大灯": ["关闭主灯"],
     "请开台灯": ["打开台灯"],
     "请关台灯": ["关闭台灯"],
     "请关副灯": ["关闭副灯"],
@@ -107,7 +113,7 @@ DIRECT_VAD_COMMAND_MAP: Dict[str, List[str | Callable | Awaitable]] = {
 
 # --- 模式二：小爱对话中继指令 ---
 # 在与“小爱同学”对话时说出，用于唤醒小智或扩展小爱功能。
-async def enter_tv_remote_mode(speaker):
+async def enter_tv_remote_mode(speaker: SpeakerProtocol):
     """
     示例函数：进入电视遥控模式。
     这是一个占位符，用于演示如何将复杂功能模块化。
@@ -116,11 +122,12 @@ async def enter_tv_remote_mode(speaker):
     # 并在此处导入和调用，以保持 config.py 的整洁。
     print("进入电视遥控模式（功能待实现）...")
     await speaker.play("好的正在准备遥控电视")
+
     pass
 
 
 XIAOAI_WAKEUP_KEYWORDS = ["召唤小智"]
-XIAOAI_EXTENSION_COMMAND_MAP: Dict[str, List[str | Callable | Awaitable]] = {
+XIAOAI_EXTENSION_COMMAND_MAP: Dict[str, List[str | Action]] = {
     # 示例：先让小爱打开电视，然后执行自定义的遥控模式函数
     "操控电视": ["打开电视", enter_tv_remote_mode],
 }
@@ -129,7 +136,8 @@ XIAOAI_EXTENSION_COMMAND_MAP: Dict[str, List[str | Callable | Awaitable]] = {
 # ==============================================================================
 # 事件处理器 (Event Handlers)
 # ==============================================================================
-async def _handle_direct_vad_command(speaker, text: str) -> bool:
+async def _handle_direct_vad_command(speaker: SpeakerProtocol,
+                                     text: str) -> bool:
     """处理通过直接VAD监听到的指令。"""
     print(f"接收到直接VAD指令: '{text}'")
     actions = DIRECT_VAD_COMMAND_MAP.get(text, [])
@@ -145,7 +153,7 @@ async def _handle_direct_vad_command(speaker, text: str) -> bool:
     return False
 
 
-async def _handle_xiaoai_command(speaker, text: str) -> bool:
+async def _handle_xiaoai_command(speaker: SpeakerProtocol, text: str) -> bool:
     """
     处理在小爱对话中捕获的指令。
     返回 True 表示需要唤醒小智，返回 False 表示仅执行扩展功能。
@@ -165,7 +173,8 @@ async def _handle_xiaoai_command(speaker, text: str) -> bool:
     return False
 
 
-async def _before_wakeup(speaker, text: str, source: str) -> bool:
+async def _before_wakeup(speaker: SpeakerProtocol, text: str,
+                         source: str) -> bool:
     """
     设备进入“唤醒”状态前的主回调函数。
     """
@@ -184,7 +193,7 @@ async def _before_wakeup(speaker, text: str, source: str) -> bool:
     return False
 
 
-async def _after_wakeup(speaker):
+async def _after_wakeup(speaker: SpeakerProtocol):
     """设备从“唤醒”状态退出时调用。"""
     await speaker.play(text="主人再见")
 

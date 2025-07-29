@@ -60,6 +60,7 @@
     docker run -itd \
       --name oxa-server \
       -v "$(pwd)/config.py:/app/config.py" \
+      -v "$(pwd)/oxa_utils:/app/oxa_utils" \
       -e MI_DEVICE_ID="<YOUR_DEVICE_ID>" \
       -e MI_TOKEN="<YOUR_TOKEN>" \
       --restart=always \

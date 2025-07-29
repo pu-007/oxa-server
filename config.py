@@ -91,7 +91,6 @@ DIRECT_VAD_COMMAND_MAP: dict[str, Actions] = {
     "重启电脑": ["我的电脑设置为一"],
     "测试电脑": ["我的电脑设置为七"],
     "联合关闭": ["关闭我的电脑", "关闭电视"],
-    ## 混合指令
     "联合启动": [wake_up_computer, "打开电视"],
 }
 
@@ -121,59 +120,64 @@ XIAOAI_EXTENSION_COMMAND_MAP: dict[str, Actions] = {
 # ==============================================================================
 # 事件处理器 (Event Handlers)
 # ==============================================================================
-async def _handle_direct_vad_command(speaker: SpeakerProtocol,
-                                     text: str) -> bool:
-    """处理通过直接VAD监听到的指令。"""
-    print(f"接收到直接VAD指令: '{text}'")
-    actions = DIRECT_VAD_COMMAND_MAP.get(text, [])
-    for action in actions:
-        if isinstance(action, str):
-            print(f"  -> 执行小爱原生指令: '{action}'")
-            await speaker.ask_xiaoai(text=action, silent=True)
-        elif callable(action):
-            print(f"  -> 执行自定义函数: {action.__name__}")
-            await action(speaker)
-        await asyncio.sleep(0.2)
-    await speaker.play(text="已执行")
-    return False
-
-
-async def _handle_xiaoai_command(speaker: SpeakerProtocol, text: str) -> bool:
+async def _before_wakeup(speaker: SpeakerProtocol, text: str,
+                         source: str) -> bool:
     """
-    处理在小爱对话中捕获的指令。
-    返回 True 表示需要唤醒小智，返回 False 表示仅执行扩展功能。
+    设备进入“唤醒”状态前的主回调函数，合并并优化了所有前置指令处理逻辑。
+
+    根据来源（source）判断是直接VAD指令还是小爱对话指令，并执行相应操作。
+    通过内部辅助函数处理通用的指令执行逻辑，减少了代码重复。
+
+    Args:
+        speaker: 音箱控制协议实例。
+        text: 识别到的文本。
+        source: 文本来源，'kws' (直接VAD) 或 'xiaoai' (小爱对话)。
+
+    Returns:
+        bool: 如果需要唤醒主助理（小智），返回 True；否则返回 False。
     """
-    actions = XIAOAI_EXTENSION_COMMAND_MAP.get(text, [])
-    if actions:
-        print(f"接收到小爱扩展指令: '{text}'")
-        await interrupt_xiaoai(speaker)  # 先打断小爱，确保控制权
+
+    async def _execute_actions(actions: Actions):
+        """辅助函数，用于执行一系列指令动作。"""
         for action in actions:
             if isinstance(action, str):
                 print(f"  -> 执行小爱原生指令: '{action}'")
                 await speaker.ask_xiaoai(text=action, silent=True)
             elif callable(action):
-                print(f"  -> 执行自定义函数: {action.__name__}")
+                print(f"  -> 执行自定义函数: {action}")
                 await action(speaker)
             await asyncio.sleep(0.2)
-    return False
 
+    # ---- 主逻辑开始 ----
 
-async def _before_wakeup(speaker: SpeakerProtocol, text: str,
-                         source: str) -> bool:
-    """
-    设备进入“唤醒”状态前的主回调函数。
-    """
     if source == "kws":
+        # 1. 检查是否为直接VAD的唤醒词
         if text in DIRECT_VAD_WAKEUP_KEYWORDS:
             await speaker.play(text="小智来了")
             return True
-        return await _handle_direct_vad_command(speaker, text)
+
+        # 2. 检查并处理直接VAD指令
+        actions = DIRECT_VAD_COMMAND_MAP.get(text, [])
+        if actions:
+            print(f"接收到直接VAD指令: '{text}'")
+            await _execute_actions(actions)
+            await speaker.play(text="已执行")
+        return False
+
     elif source == "xiaoai":
+        # 1. 检查是否为通过小爱对话唤醒的关键词
         if text in XIAOAI_WAKEUP_KEYWORDS:
             await interrupt_xiaoai(speaker)
             await speaker.play(text="小智来了")
             return True
-        return await _handle_xiaoai_command(speaker, text)
+
+        # 2. 检查并处理小爱扩展指令
+        actions = XIAOAI_EXTENSION_COMMAND_MAP.get(text, [])
+        if actions:
+            print(f"接收到小爱扩展指令: '{text}'")
+            await interrupt_xiaoai(speaker)
+            await _execute_actions(actions)
+        return False
 
     return False
 

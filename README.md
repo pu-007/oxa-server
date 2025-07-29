@@ -116,6 +116,16 @@ APP_CONFIG = AppConfigBuilder(
 
 一个辅助函数，用于快速生成设备的标准“开/关”指令。例如 `map_the_switches("空调", "灯")` 会自动创建 `请开空调`、`请关空调`、`请开灯`、`请关灯` 四个指令。
 
+#### 进阶配置 (可选)
+
+`AppConfigBuilder` 还提供了一些可选参数，用于微调小智的行为。
+
+- **`xiaoai_extension_command_map`**: 定义一组特殊的指令。当你在和小爱同学正常对话时，如果说出这里的指令，小智会**中断**小爱的当前任务并执行该指令。这对于需要立即响应的控制非常有用。
+- **`wakeup_timeout`**: 唤醒超时（秒）。当使用 `direct_vad_wakeup_keywords` 唤醒小智后，它会在此时间内等待你的下一条指令，超时后会自动退出唤醒状态。默认为 `5` 秒。
+- **`on_wakeup_play_text`**: 唤醒提示音。唤醒小智后播放的文本。默认为 `"小智来了"`。
+- **`on_execute_play_text`**: 执行提示音。当一个免唤醒指令执行完毕后播放的文本。默认为 `"已执行"`。
+- **`on_exit_play_text`**: 退出提示音。小智退出唤醒状态时播放的文本。默认为 `"主人再见"`。
+
 ### 🐍 自定义 Python 函数
 
 你可以在 `config.py` 的顶部自由编写自己的 Python 异步函数，并在 `direct_vad_command_map` 中引用它们。
@@ -256,6 +266,16 @@ This is the core **wake-word-free command table**. When Xiaoai Speaker recognize
 #### `map_the_switches(*devices)`
 
 A helper function to quickly generate standard "on/off" commands for devices. For example, `map_the_switches("AC", "Light")` will automatically create commands for `turn on AC`, `turn off AC`, `turn on Light`, and `turn off Light`.
+
+#### Advanced Configuration (Optional)
+
+`AppConfigBuilder` also provides several optional parameters to fine-tune Xiaozhi's behavior.
+
+- **`xiaoai_extension_command_map`**: Defines a special set of commands. If you say one of these commands during a normal conversation with the native Xiaoai, Xiaozhi will **interrupt** the current task and execute the command. This is useful for controls that require immediate response.
+- **`wakeup_timeout`**: Wake-up timeout (in seconds). After waking up Xiaozhi with a keyword from `direct_vad_wakeup_keywords`, it will wait for your next command for this duration before automatically exiting the awakened state. Defaults to `5` seconds.
+- **`on_wakeup_play_text`**: Text played upon wake-up. Defaults to `"Xiaozhi is here"`.
+- **`on_execute_play_text`**: Text played after a wake-word-free command is executed. Defaults to `"Done"`.
+- **`on_exit_play_text`**: Text played when Xiaozhi exits the awakened state. Defaults to `"Goodbye, master"`.
 
 ### 🐍 Custom Python Functions
 

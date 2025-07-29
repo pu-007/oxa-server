@@ -8,7 +8,7 @@ Oxa-Server 全局配置文件
 import asyncio
 
 from oxa_ext.type_defines import SpeakerProtocol, Actions
-from oxa_ext.utils import ensure_dependencies, map_all_to, interrupt_xiaoai
+from oxa_ext.utils import ensure_dependencies, map_all_to, interrupt_xiaoai, map_the_switches
 
 # ==============================================================================
 # 主要应用配置 (Primary Application Configuration)
@@ -68,19 +68,12 @@ DIRECT_VAD_COMMAND_MAP: dict[str, Actions] = {
     **map_all_to(("切换电视", "请开电视", "请关电视"), ["打开电视"]),
     **map_all_to(("切换主灯", "请开大灯", "请关大灯"), ["请关主灯"]),
     **map_all_to(("调整颜色", "请开夜灯", "请关夜灯"), ["色温分段"]),
-    "请开空调": ["打开空调"],
-    "请关空调": ["关闭空调"],
+    **map_the_switches("空调", "风扇", "台灯", "副灯"),
     "空调升速": ["空调风速升高"],
     "空调降速": ["空调风速降低"],
-    "请开风扇": ["打开风扇"],
-    "请关风扇": ["关闭风扇"],
-    "请开台灯": ["打开台灯"],
-    "请关台灯": ["关闭台灯"],
-    "请关副灯": ["关闭副灯"],
-    "请开副灯": ["打开副灯"],
-    "切换色温": ["色温分段"],
     "空调降温": ["空调温度降低"],
     "空调升温": ["空调温度升高"],
+    "切换色温": ["色温分段"],
     "风扇定时": ["风扇时间"],
     "风扇风类": ["调整风类"],
     ## 连续指令

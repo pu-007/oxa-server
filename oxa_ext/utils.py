@@ -36,6 +36,33 @@ def ensure_dependencies(requirements: list[str]):
     print("依赖安装完成。")
 
 
+def map_the_switches(*devices: str) -> dict:
+    """
+    根据一个包含设备名称的列表，生成对应的开关指令字典。
+
+    Args:
+        device_list (list): 一个包含设备名称字符串的列表，例如 ["空调", "风扇"]。
+
+    Returns:
+        dict: 一个包含“开”和“关”指令的字典。
+    """
+    command_dict = {}
+    for device in devices:
+        # 使用 f-string 格式化字符串，代码更简洁易读
+
+        # 生成“开”指令
+        on_key = f"请开{device}"
+        on_value = [f"打开{device}"]
+        command_dict[on_key] = on_value
+
+        # 生成“关”指令
+        off_key = f"请关{device}"
+        off_value = [f"关闭{device}"]
+        command_dict[off_key] = off_value
+
+    return command_dict
+
+
 async def interrupt_xiaoai(speaker: SpeakerProtocol):
     """
     中断小爱同学当前的对话或播放，并等待其服务重启。

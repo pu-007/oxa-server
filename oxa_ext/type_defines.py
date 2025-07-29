@@ -1,4 +1,4 @@
-from typing import Dict, Literal, Optional, Protocol, TypedDict
+from typing import Dict, Literal, Optional, Protocol, TypedDict, Awaitable, Callable
 
 
 class CommandResult(TypedDict):
@@ -154,3 +154,6 @@ class SpeakerProtocol(Protocol):
             包含标准输出、标准错误和退出码的字典
         """
         ...
+
+
+Actions = list[str | Callable[[SpeakerProtocol], Awaitable[None]]]

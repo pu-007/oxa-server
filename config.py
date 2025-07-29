@@ -6,11 +6,9 @@ Oxa-Server 全局配置文件
 为了方便用户修改，常用配置项（如设备信息、网络地址等）都已拆分为独立的顶级变量，并附有注释。
 """
 import asyncio
-import os
-import subprocess
-from typing import Dict, List, Callable, Awaitable
 
-from oxa_ext.speaker_protocol import SpeakerProtocol
+from oxa_ext.type_defines import SpeakerProtocol, Actions
+from oxa_ext.utils import ensure_dependencies, map_all_to, interrupt_xiaoai
 
 # ==============================================================================
 # 主要应用配置 (Primary Application Configuration)
@@ -36,11 +34,10 @@ XIAOZHI_CONFIG = {
     "VERIFICATION_CODE": "699244",  # 设备验证码
 }
 
+
 # ==============================================================================
 # 自定义功能实现 (Custom Function Implementations)
 # ==============================================================================
-Action = Callable[[SpeakerProtocol], Awaitable[None]]
-
 
 # 在这里定义您的自定义异步函数，例如网络唤醒、API调用等。
 async def wake_up_computer(_):
@@ -48,7 +45,7 @@ async def wake_up_computer(_):
     发送网络唤醒 (Wake-on-LAN) 魔法包来启动电脑。
     请确保已安装 'wakeonlan' 库，并替换为您的 MAC 地址和广播 IP。
     """
-    _ensure_dependencies(["wakeonlan"])
+    ensure_dependencies(["wakeonlan"])
     computer_mac = "08BFB8A67CE2"
     subnet_broadcast_ip = "192.168.100.255"
     from wakeonlan import send_magic_packet
@@ -66,30 +63,25 @@ async def wake_up_computer(_):
 # --- 模式一：直接VAD唤醒指令 ---
 # 无需说“小爱同学”，直接说出这些词即可触发。
 DIRECT_VAD_WAKEUP_KEYWORDS = ["小智小智"]
-DIRECT_VAD_COMMAND_MAP: Dict[str, List[str | Action]] = {
+DIRECT_VAD_COMMAND_MAP: dict[str, Actions] = {
     ## 小爱同学原生指令
-    "切换电视": ["打开电视"],
-    "请开电视": ["打开电视"],
-    "请关电视": ["关闭电视"],
+    **map_all_to(("切换电视", "请开电视", "请关电视"), ["打开电视"]),
+    **map_all_to(("切换主灯", "请开大灯", "请关大灯"), ["请关主灯"]),
+    **map_all_to(("调整颜色", "请开夜灯", "请关夜灯"), ["色温分段"]),
     "请开空调": ["打开空调"],
     "请关空调": ["关闭空调"],
     "空调升速": ["空调风速升高"],
     "空调降速": ["空调风速降低"],
     "请开风扇": ["打开风扇"],
     "请关风扇": ["关闭风扇"],
-    "切换主灯": ["打开主灯"],
-    "请开大灯": ["打开主灯"],
-    "请关大灯": ["关闭主灯"],
     "请开台灯": ["打开台灯"],
     "请关台灯": ["关闭台灯"],
     "请关副灯": ["关闭副灯"],
     "请开副灯": ["打开副灯"],
     "切换色温": ["色温分段"],
-    "调整颜色": ["色温分段"],
-    "打开夜灯": ["昏暗模式"],
     "空调降温": ["空调温度降低"],
     "空调升温": ["空调温度升高"],
-    "风扇定时": ["定时风扇"],
+    "风扇定时": ["风扇时间"],
     "风扇风类": ["调整风类"],
     ## 连续指令
     "点亮外面": ["打开台灯", "打开副灯"],
@@ -127,7 +119,7 @@ async def enter_tv_remote_mode(speaker: SpeakerProtocol):
 
 
 XIAOAI_WAKEUP_KEYWORDS = ["召唤小智"]
-XIAOAI_EXTENSION_COMMAND_MAP: Dict[str, List[str | Action]] = {
+XIAOAI_EXTENSION_COMMAND_MAP: dict[str, Actions] = {
     # 示例：先让小爱打开电视，然后执行自定义的遥控模式函数
     "操控电视": ["打开电视", enter_tv_remote_mode],
 }
@@ -161,7 +153,7 @@ async def _handle_xiaoai_command(speaker: SpeakerProtocol, text: str) -> bool:
     actions = XIAOAI_EXTENSION_COMMAND_MAP.get(text, [])
     if actions:
         print(f"接收到小爱扩展指令: '{text}'")
-        await _interrupt_xiaoai(speaker)  # 先打断小爱，确保控制权
+        await interrupt_xiaoai(speaker)  # 先打断小爱，确保控制权
         for action in actions:
             if isinstance(action, str):
                 print(f"  -> 执行小爱原生指令: '{action}'")
@@ -185,7 +177,7 @@ async def _before_wakeup(speaker: SpeakerProtocol, text: str,
         return await _handle_direct_vad_command(speaker, text)
     elif source == "xiaoai":
         if text in XIAOAI_WAKEUP_KEYWORDS:
-            await _interrupt_xiaoai(speaker)
+            await interrupt_xiaoai(speaker)
             await speaker.play(text="小智来了")
             return True
         return await _handle_xiaoai_command(speaker, text)
@@ -196,48 +188,6 @@ async def _before_wakeup(speaker: SpeakerProtocol, text: str,
 async def _after_wakeup(speaker: SpeakerProtocol):
     """设备从“唤醒”状态退出时调用。"""
     await speaker.play(text="主人再见")
-
-
-# ==============================================================================
-# 辅助函数 (Helper Functions)
-# ==============================================================================
-
-
-def _ensure_dependencies(requirements: list[str]):
-    """
-    检查并安装缺失的 Python 依赖包。
-    确保在执行需要特定库的函数前，这些库是可用的。
-    """
-    import importlib.util
-    missing_packages = [
-        pkg for pkg in requirements if not importlib.util.find_spec(pkg)
-    ]
-
-    if not missing_packages:
-        return
-
-    print(f"检测到缺失的依赖: {missing_packages}，正在尝试安装...")
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    python_executable = os.path.join(script_dir, '.venv', "bin", 'python')
-    if not os.path.exists(python_executable):
-        import sys
-        python_executable = sys.executable
-        print(f"未找到虚拟环境，使用系统 Python: {python_executable}")
-
-    subprocess.run([python_executable, "-m", "ensurepip"], check=False)
-    subprocess.run(
-        [python_executable, "-m", "pip", "install", *missing_packages],
-        check=True)
-    print("依赖安装完成。")
-
-
-async def _interrupt_xiaoai(speaker):
-    """
-    中断小爱同学当前的对话或播放，并等待其服务重启。
-    这是一个公共函数，用于在自定义指令执行前“清场”。
-    """
-    await speaker.abort_xiaoai()
-    await asyncio.sleep(2)
 
 
 # ==============================================================================

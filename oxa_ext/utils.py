@@ -1,4 +1,5 @@
 from oxa_ext.type_defines import SpeakerProtocol, Actions
+from typing import Any
 import os
 import subprocess
 import asyncio
@@ -70,3 +71,121 @@ async def interrupt_xiaoai(speaker: SpeakerProtocol):
     """
     await speaker.abort_xiaoai()
     await asyncio.sleep(2)
+
+
+class AppConfigBuilder:
+    """
+    一个用于构建 APP_CONFIG 的构建器类。
+
+    它通过创建闭包来生成回调函数，以确保回调函数在被外部系统调用时
+    （即使不传递 self），也能正确访问类的实例数据。
+    """
+
+    # ... __init__ 方法和之前一样，保持不变 ...
+    def __init__(
+        self,
+        # --- 核心指令和关键词常量 ---
+        direct_vad_wakeup_keywords: list[str],
+        direct_vad_command_map: dict[str, Actions],
+        xiaoai_wakeup_keywords: list[str],
+        xiaoai_extension_command_map: dict[str, Actions],
+
+        # --- 基础配置字典 ---
+        vad_config: dict[str, Any],
+        xiaozhi_config: dict[str, Any],
+
+        # --- 可选的微调参数 ---
+        wakeup_timeout: int = 5,
+        on_wakeup_play_text: str = "小智来了",
+        on_execute_play_text: str = "已执行",
+        on_exit_play_text: str = "主人再见",
+    ):
+        """初始化构建器，仅保存用户定义的常量和配置。"""
+        self.direct_vad_wakeup_keywords = direct_vad_wakeup_keywords
+        self.direct_vad_command_map = direct_vad_command_map
+        self.xiaoai_wakeup_keywords = xiaoai_wakeup_keywords
+        self.xiaoai_extension_command_map = xiaoai_extension_command_map
+        self.vad_config = vad_config
+        self.xiaozhi_config = xiaozhi_config
+        self.wakeup_timeout = wakeup_timeout
+        self.on_wakeup_play_text = on_wakeup_play_text
+        self.on_execute_play_text = on_execute_play_text
+        self.on_exit_play_text = on_exit_play_text
+
+    async def _execute_actions(self, speaker: SpeakerProtocol,
+                               actions: Actions):
+        """辅助方法，用于执行一系列指令动作。"""
+        # ... 此方法逻辑不变 ...
+        for action in actions:
+            if isinstance(action, str):
+                print(f"  -> 执行小爱原生指令: '{action}'")
+                await speaker.ask_xiaoai(text=action, silent=True)
+            elif callable(action):
+                print(
+                    f"  -> 执行自定义函数: {getattr(action, '__name__', 'unknown_function')}"
+                )
+                await action(speaker)
+            await asyncio.sleep(0.2)
+
+    async def _internal_before_wakeup(self, speaker: SpeakerProtocol,
+                                      text: str, source: str) -> bool:
+        """回调的内部实现，它需要 self。"""
+        if source == "kws":
+            if text in self.direct_vad_wakeup_keywords:
+                await speaker.play(text=self.on_wakeup_play_text)
+                return True
+            actions = self.direct_vad_command_map.get(text)
+            if actions:
+                print(f"接收到直接VAD指令: '{text}'")
+                await self._execute_actions(speaker, actions)
+                await speaker.play(text=self.on_execute_play_text)
+            return False
+        elif source == "xiaoai":
+            if text in self.xiaoai_wakeup_keywords:
+                await interrupt_xiaoai(speaker)
+                await speaker.play(text=self.on_wakeup_play_text)
+                return True
+            actions = self.xiaoai_extension_command_map.get(text)
+            if actions:
+                print(f"接收到小爱扩展指令: '{text}'")
+                await interrupt_xiaoai(speaker)
+                await self._execute_actions(speaker, actions)
+            return False
+        return False
+
+    async def _internal_after_wakeup(self, speaker: SpeakerProtocol):
+        """设备从“唤醒”状态退出时调用的内部实现。"""
+        await speaker.play(text=self.on_exit_play_text)
+
+    def build(self) -> dict[str, Any]:
+        """组装并返回最终的 APP_CONFIG 字典。"""
+
+        # 创建包装器函数 (闭包)
+        # 这个 wrapper 函数可以访问 `self`，但它自身的签名没有 `self`
+        async def before_wakeup_wrapper(speaker: SpeakerProtocol, text: str,
+                                        source: str) -> bool:
+            # 当外部调用 wrapper 时，它会调用我们真正的内部方法，并把 self 传进去
+            return await self._internal_before_wakeup(speaker, text, source)
+
+        async def after_wakeup_wrapper(speaker: SpeakerProtocol):
+            return await self._internal_after_wakeup(speaker)
+
+        # -------------------------------------------------------------------
+
+        all_vad_keywords = [
+            *self.direct_vad_wakeup_keywords,
+            *list(self.direct_vad_command_map.keys())
+        ]
+
+        wakeup_config = {
+            "keywords": all_vad_keywords,
+            "timeout": self.wakeup_timeout,
+            "before_wakeup": before_wakeup_wrapper,  # 使用新的包装器
+            "after_wakeup": after_wakeup_wrapper,  # 使用新的包装器
+        }
+
+        return {
+            "vad": self.vad_config,
+            "xiaozhi": self.xiaozhi_config,
+            "wakeup": wakeup_config,
+        }

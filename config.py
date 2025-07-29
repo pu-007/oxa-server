@@ -211,4 +211,6 @@ APP_CONFIG = {
     "wakeup": WAKEUP_CONFIG,
 }
 
+#TODO: 封装上面的加载器，将用户配置和APP_CONFIG生成独立开来，方便用户自定义
+
 print("✅ Oxa-Server 配置加载完成。")

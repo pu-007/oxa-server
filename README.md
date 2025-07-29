@@ -62,8 +62,6 @@
       -p 4399:4399 \
       -v "$(pwd)/config.py:/app/config.py" \
       -v "$(pwd)/oxa_ext:/app/oxa_ext" \
-      -e MI_DEVICE_ID="<YOUR_DEVICE_ID>" \
-      -e MI_TOKEN="<YOUR_TOKEN>" \
       --restart=always \
       idootop/open-xiaoai:xiaozhi
     ```
@@ -73,39 +71,73 @@
 
 ### ⚙️ 配置说明
 
-`config.py` 文件是本项目的核心配置文件，通过修改其中的变量和字典，你可以高度定制小爱同学的行为。
+`config.py` 文件是本项目的核心配置文件。通过修改其中的 Python 变量和字典，你可以高度定制小爱同学的行为。我们提供了一系列工具函数，让配置过程更简单、更高效。
+
+#### 主要配置变量
+
+-   `VAD_CONFIG`: 语音活动检测 (VAD) 的高级参数，通常无需修改。
+-   `XIAOZHI_CONFIG`: 连接 `open-xiaoai` 云服务的配置。
 
 #### `DIRECT_VAD_WAKEUP_KEYWORDS`
 
-*   **作用**: 定义用于直接唤醒小智的关键词列表（例如 `["小智小智"]`）。当小爱同学识别到这些词语时，会进入小智模式准备接收下一条指令。
+-   **作用**: 定义一个或多个“超级唤醒词”（例如 `["小智小智"]`）。当小爱同学听到这些词，会激活小智模式，准备接收下一条免唤醒指令。
 
 #### `DIRECT_VAD_COMMAND_MAP`
 
-*   **作用**: 这是核心的 **免唤醒** 指令映射表。它将你对小爱同学说出的自定义指令（键）映射到一个或多个实际执行的动作（值）。动作可以是小爱同学的原生指令字符串，也可以是自定义的 Python 异步函数。
-*   **配置方式**: 
-    *   **原生指令映射**: `"你的自定义指令": ["小爱原生指令"]`。例如：`"切换电视": ["打开电视"]`。
-    *   **组合指令**: `"你的组合指令": ["小爱原生指令1", "小爱原生指令2", ...]`。例如：`"点亮外面": ["打开台灯", "打开副灯"]`。
-    *   **Python 函数调用**: `"你的自定义指令": [你的异步函数名]`。例如：`"请开电脑": [wake_up_computer]`。
-    *   **混合指令**: `"你的混合指令": [你的异步函数名, "小爱原生指令"]`。例如：`"联合启动": [wake_up_computer, "打开电视"]`。
-    *   `wake_up_computer` 是一个示例函数，用于发送网络唤醒包。你可以根据需要在 `config.py` 或 `oxa_ext` 目录中编写自己的 Python 函数。
+-   **作用**: 这是核心的 **免唤醒** 指令映射表。它将你口述的指令（键）映射到一个或多个具体动作（值）。
+-   **动作 (Actions)**: 可以是小爱同学的原生指令（字符串），也可以是你自己编写的 Python 异步函数。
+-   **配置示例**:
+    ```python
+    from oxa_ext.utils import map_all_to, map_the_switches
+
+    DIRECT_VAD_COMMAND_MAP = {
+        # 基础映射: "打开电视" -> 执行原生指令 "打开电视"
+        "打开电视": ["打开电视"],
+
+        # 组合指令: "我出门了" -> 先关灯，再关空调
+        "我出门了": ["关闭所有灯", "关闭空调"],
+
+        # 函数调用: "打开电脑" -> 执行自定义的 wake_up_computer 函数
+        "打开电脑": [wake_up_computer],
+
+        # 混合指令: "我到家了" -> 先开电脑，再说“欢迎回家”
+        "我到家了": [wake_up_computer, "欢迎回家"],
+    }
+    ```
 
 #### `XIAOAI_WAKEUP_KEYWORDS`
 
-*   **作用**: 定义在与小爱对话过程中，用于唤醒小智的关键词，例如 `["召唤小智"]`。
+-   **作用**: 定义在与小爱原生对话时，用于“召唤”小智的关键词，例如 `["召唤小智"]`。
 
 #### `XIAOAI_EXTENSION_COMMAND_MAP`
 
-*   **作用**: 扩展小爱原生对话的能力。当你在和小爱对话时说出这里的关键词，可以触发额外的原生指令或自定义函数。
+-   **作用**: 扩展小爱原生对话的能力。当你在和小爱对话时说出此处的关键词，可以中断它并执行你的自定义操作。
+-   **配置示例**:
+    ```python
+    from oxa_ext.utils import interrupt_xiaoai
 
-#### `XIAOZHI_CONFIG`
+    XIAOAI_EXTENSION_COMMAND_MAP = {
+        # 当对小爱说“帮我打开电脑”时...
+        "帮我打开电脑": [
+            interrupt_xiaoai,  # 首先中断小爱，防止它回复
+            wake_up_computer   # 然后执行开机函数
+        ],
+    }
+    ```
 
-*   **作用**: 配置与 `open-xiaoai` `xiaozhi` 服务相关的连接参数。
-*   **配置项**: 
-    *   `OTA_URL`: OTA (Over-The-Air) 更新服务的 URL。
-    *   `WEBSOCKET_URL`: WebSocket 服务器的 URL，用于与小爱同学服务通信。
-    *   `WEBSOCKET_ACCESS_TOKEN`: 连接 WebSocket 服务器所需的访问令牌。
-    *   `DEVICE_ID`: 你的小爱同学设备的唯一 ID。**重要：请务必替换为你的真实设备 ID。**
-    *   `VERIFICATION_CODE`: 用于设备验证的验证码。
+### 🛠️ 辅助工具函数 (`oxa_ext/utils.py`)
+
+为了简化 `config.py` 的配置，我们在 `oxa_ext/utils.py` 中提供了一些实用的辅助函数，你可以直接在配置文件中导入和使用它们。
+
+-   **`map_all_to(keys, value)`**: 将多个语音指令（`keys`，一个元组）映射到同一组动作（`value`）。
+    -   **示例**: `**map_all_to(("关灯", "熄灯"), ["关闭主灯"])` 会让“关灯”和“熄灯”都执行“关闭主灯”的动作。
+
+-   **`map_the_switches(*devices)`**: 为一系列设备快速生成标准的“开”和“关”指令。
+    -   **示例**: `**map_the_switches("空调", "风扇")` 会自动创建 `"打开空调"`, `"关闭空调"`, `"打开风扇"`, `"关闭风扇"` 四个指令。
+
+-   **`ensure_dependencies(packages)`**: 在你的自定义函数中调用，以确保需要的 Python 包（如 `wakeonlan`）已被自动安装。
+
+-   **`interrupt_xiaoai(speaker)`**: 一个可被调用的动作，用于在执行后续指令前，中断小爱同学当前的对话或播放。
 
 ### 🔗 关联项目
 
@@ -158,7 +190,7 @@ The core of this project is to provide a more powerful configuration.
     docker stop oxa-server && docker rm oxa-server
     ```
 
-2.  **Download or clone** this project, ensuring `config.py` and the `oxa_ext` directory are in the same path. Modify `config.py` to suit your needs.
+2.  **Download or clone** this project. Copy `config.template.py` to `config.py` and modify it to suit your needs.
 
 3.  **Re-run the container**, but this time, use the `-v` flag to mount `config.py` and `oxa_ext` into the container.
 
@@ -171,8 +203,6 @@ The core of this project is to provide a more powerful configuration.
       -p 4399:4399 \
       -v "$(pwd)/config.py:/app/config.py" \
       -v "$(pwd)/oxa_ext:/app/oxa_ext" \
-      -e MI_DEVICE_ID="<YOUR_DEVICE_ID>" \
-      -e MI_TOKEN="<YOUR_TOKEN>" \
       --restart=always \
       idootop/open-xiaoai:xiaozhi
     ```
@@ -182,39 +212,73 @@ This way, you can enjoy the powerful base functionality of `open-xiaoai` while e
 
 ### ⚙️ Configuration Explanation
 
-The `config.py` file is the core configuration file for this project. By modifying its variables and dictionaries, you can highly customize the behavior of your Xiaoai Speaker.
+The `config.py` file is the core configuration file for this project. By modifying its Python variables and dictionaries, you can highly customize the behavior of your Xiaoai Speaker. We provide a set of utility functions to make the configuration process simpler and more efficient.
+
+#### Main Configuration Variables
+
+-   `VAD_CONFIG`: Advanced parameters for Voice Activity Detection (VAD), usually no need to modify.
+-   `XIAOZHI_CONFIG`: Configuration for connecting to the `open-xiaoai` cloud service.
 
 #### `DIRECT_VAD_WAKEUP_KEYWORDS`
 
-*   **Purpose**: Defines a list of keywords to directly wake up Xiaozhi (e.g., `["Xiaozhi Xiaozhi"]`). When the speaker recognizes these words, it enters Xiaozhi mode, ready to receive the next command.
+-   **Purpose**: Defines one or more "super wake-words" (e.g., `["Xiaozhi Xiaozhi"]`). When the speaker hears these words, it activates Xiaozhi mode, ready to receive the next wake-word-free command.
 
 #### `DIRECT_VAD_COMMAND_MAP`
 
-*   **Purpose**: This is the core **wake-word-free** command map. It maps your custom spoken commands (keys) to one or more actions (values). Actions can be native Xiaoai Speaker command strings or custom Python asynchronous functions.
-*   **Configuration**: 
-    *   **Native Command Mapping**: `"Your Custom Command": ["Native Xiaoai Command"]`. Example: `"switch TV": ["turn on TV"]`.
-    *   **Combined Commands**: `"Your Combined Command": ["Native Command 1", "Native Command 2", ...]`. Example: `"lights on outside": ["turn on desk lamp", "turn on aux light"]`.
-    *   **Python Function Calls**: `"Your Custom Command": [your_async_function_name]`. Example: `"turn on PC": [wake_up_computer]`.
-    *   **Mixed Commands**: `"Your Mixed Command": [your_async_function_name, "Native Command"]`. Example: `"joint startup": [wake_up_computer, "turn on TV"]`.
-    *   `wake_up_computer` is an example function for sending a Wake-on-LAN packet. You can write your own Python functions in `config.py` or within the `oxa_ext` directory.
+-   **Purpose**: This is the core **wake-word-free** command map. It maps your spoken commands (keys) to one or more specific actions (values).
+-   **Actions**: Can be native Xiaoai Speaker commands (strings) or your own custom Python asynchronous functions.
+-   **Configuration Example**:
+    ```python
+    from oxa_ext.utils import map_all_to, map_the_switches
+
+    DIRECT_VAD_COMMAND_MAP = {
+        # Basic mapping: "turn on TV" -> executes native command "turn on TV"
+        "turn on TV": ["turn on TV"],
+
+        # Combined commands: "I'm leaving" -> turn off lights, then turn off AC
+        "I'm leaving": ["turn off all lights", "turn off AC"],
+
+        # Function call: "turn on PC" -> executes the custom wake_up_computer function
+        "turn on PC": [wake_up_computer],
+
+        # Mixed commands: "I'm home" -> turn on PC, then say "welcome home"
+        "I'm home": [wake_up_computer, "welcome home"],
+    }
+    ```
 
 #### `XIAOAI_WAKEUP_KEYWORDS`
 
-*   **Purpose**: Defines keywords used to wake up Xiaozhi during a conversation with the native Xiaoai, e.g., `["summon Xiaozhi"]`.
+-   **Purpose**: Defines keywords used to "summon" Xiaozhi during a native conversation with Xiaoai, e.g., `["summon Xiaozhi"]`.
 
 #### `XIAOAI_EXTENSION_COMMAND_MAP`
 
-*   **Purpose**: Extends the native Xiaoai dialogue capabilities. When you say a keyword from this map during a conversation, it can trigger additional native commands or custom functions.
+-   **Purpose**: Extends the native Xiaoai dialogue capabilities. When you say a keyword from this map during a conversation, it can interrupt Xiaoai and execute your custom action.
+-   **Configuration Example**:
+    ```python
+    from oxa_ext.utils import interrupt_xiaoai
 
-#### `XIAOZHI_CONFIG`
+    XIAOAI_EXTENSION_COMMAND_MAP = {
+        # When you say to Xiaoai "help me turn on the computer"...
+        "help me turn on the computer": [
+            interrupt_xiaoai,  # First, interrupt Xiaoai to prevent it from replying
+            wake_up_computer   # Then, execute the power-on function
+        ],
+    }
+    ```
 
-*   **Purpose**: Configures connection parameters related to the `open-xiaoai` `xiaozhi` service.
-*   **Configuration Items**: 
-    *   `OTA_URL`: The URL for the OTA (Over-The-Air) update service.
-    *   `WEBSOCKET_URL`: The URL of the WebSocket server for communication with the Xiaoai service.
-    *   `WEBSOCKET_ACCESS_TOKEN`: The access token required to connect to the WebSocket server.
-    *   `DEVICE_ID`: The unique ID of your Xiaoai Speaker device. **Important: Please replace this with your actual Device ID.**
-    *   `VERIFICATION_CODE`: The verification code used for device authentication.
+### 🛠️ Utility Functions (`oxa_ext/utils.py`)
+
+To simplify the configuration in `config.py`, we provide several useful helper functions in `oxa_ext/utils.py` that you can import and use directly in your configuration file.
+
+-   **`map_all_to(keys, value)`**: Maps multiple voice commands (`keys`, a tuple) to the same set of actions (`value`).
+    -   **Example**: `**map_all_to(("lights off", "darkness"), ["turn off main light"])` makes both "lights off" and "darkness" execute the "turn off main light" action.
+
+-   **`map_the_switches(*devices)`**: Quickly generates standard "on" and "off" commands for a series of devices.
+    -   **Example**: `**map_the_switches("AC", "fan")` will automatically create four commands: `"turn on AC"`, `"turn off AC"`, `"turn on fan"`, and `"turn off fan"`.
+
+-   **`ensure_dependencies(packages)`**: Call this in your custom functions to ensure that required Python packages (e.g., `wakeonlan`) are automatically installed.
+
+-   **`interrupt_xiaoai(speaker)`**: A callable action used to interrupt Xiaoai's current dialogue or playback before executing subsequent commands.
 
 ### 🔗 Related Projects
 

@@ -28,7 +28,6 @@ APP_CONFIG = AppConfigBuilder(
         "灯光全灭": off(*lights_all),
         "关灯空调": off(*lights_all, "空调"),
         "全部关闭": off(*appliances_all),
-        # TODO: 电脑操作与客户端 cut_in_xiaoai 使用 fastapi 通信 / 一键转化配置
         "请开电脑": [wake_up_computer],
         "请关电脑": ["关闭我的电脑"],
         "重启电脑": ["我的电脑设置为一"],
@@ -38,7 +37,6 @@ APP_CONFIG = AppConfigBuilder(
         "联合启动": [wake_up_computer, "打开电视"],
     },
     xiaoai_wakeup_keywords=["召唤小智"],
-    # TODO: 小爱电视遥控器模式 可连续对话
     xiaoai_extension_command_map={},
     on_execute_play_text="",
     vad_config={

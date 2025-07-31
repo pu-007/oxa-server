@@ -163,18 +163,21 @@ class AppConfigBuilder:
         """回调的内部实现，它需要 self。"""
         if source == "kws":
             if text in self.direct_vad_wakeup_keywords:
-                await speaker.play(text=self.on_wakeup_play_text)
+                if self.on_wakeup_play_text:
+                    await speaker.play(text=self.on_wakeup_play_text)
                 return True
             actions = self.direct_vad_command_map.get(text)
             if actions:
                 print(f"接收到直接VAD指令: '{text}'")
                 await self._execute_actions(speaker, actions)
-                await speaker.play(text=self.on_execute_play_text)
+                if self.on_execute_play_text:
+                    await speaker.play(text=self.on_execute_play_text)
             return False
         elif source == "xiaoai":
             if text in self.xiaoai_wakeup_keywords:
                 await interrupt_xiaoai(speaker)
-                await speaker.play(text=self.on_wakeup_play_text)
+                if self.on_wakeup_play_text:
+                    await speaker.play(text=self.on_wakeup_play_text)
                 return True
             actions = self.xiaoai_extension_command_map.get(text)
             if actions:
@@ -186,7 +189,8 @@ class AppConfigBuilder:
 
     async def _internal_after_wakeup(self, speaker: SpeakerProtocol):
         """设备从“唤醒”状态退出时调用的内部实现。"""
-        await speaker.play(text=self.on_exit_play_text)
+        if self.on_exit_play_text:
+            await speaker.play(text=self.on_exit_play_text)
 
     def build(self) -> dict[str, Any]:
         """组装并返回最终的 APP_CONFIG 字典。"""

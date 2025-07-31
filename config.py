@@ -52,10 +52,10 @@ APP_CONFIG = AppConfigBuilder(
     # TODO: 小爱电视遥控器模式 可连续对话
     xiaoai_extension_command_map={},
     vad_config={
-        "boost": 200,
-        "threshold": 0.1,
-        "min_speech_duration": 1000,
-        "min_silence_duration": 1000,
+        "boost": 100,
+        "threshold": 0.45,
+        "min_speech_duration": 300,
+        "min_silence_duration": 300,
     },
     xiaozhi_config={
         "OTA_URL": "https://2662r3426b.vicp.fun/xiaozhi/ota/",

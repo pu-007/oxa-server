@@ -57,7 +57,7 @@ APP_CONFIG = AppConfigBuilder(
     on_execute_play_text="",
     vad_config={
         "boost": 100,
-        "threshold": 0.45,
+        "threshold": 0.40,
         "min_speech_duration": 300,
         "min_silence_duration": 300,
     },
@@ -66,5 +66,5 @@ APP_CONFIG = AppConfigBuilder(
         "WEBSOCKET_URL": "wss://2662r3426b.vicp.fun/xiaozhi/v1/",
         "WEBSOCKET_ACCESS_TOKEN": "",
         "DEVICE_ID": "70:70:fc:05:83:fa",
-        "VERIFICATION_CODE": "699244",
+        "VERIFICATION_CODE": "976551",
     }).build()

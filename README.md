@@ -74,22 +74,33 @@ APP_CONFIG = AppConfigBuilder(
     # 1. 免唤醒直接执行的指令
     direct_vad_command_map={
         # a. 将多个指令映射到同一个动作
-        **map_all_to(("切换电视", "请开电视"), ["打开电视"]),
+        **map_all_to(("调整颜色", "切换色温", "请开夜灯", "请关夜灯"), ["色温分段"]),
 
         # b. 批量生成开关指令
-        **map_the_switches("空调", "风扇", "台灯"),
+        **map_the_switches(*lights_all, *appliances_extra),
         # 上一行等同于:
         # "请开空调": ["打开空调"], "请关空调": ["关闭空调"],
         # "请开风扇": ["打开风扇"], "请关风扇": ["关闭风扇"],
         # ...
 
         # c. 将指令映射到自定义的 Python 函数
+        "空调升速": ["空调风速升高"],
+        "空调降速": ["空调风速降低"],
+        "空调降温": ["空调温度降低"],
+        "空调升温": ["空调温度升高"],
+        "风扇定时": ["风扇计时器"],
+        "风扇风类": ["调整风类"],
+        "点亮阳台": on(*lights_balcony),
+        "熄灭阳台": off(*lights_balcony),
+        "灯光全灭": off(*lights_all),
+        "关灯空调": off(*lights_all, "空调"),
+        "全部关闭": off(*appliances_all),
         "请开电脑": [wake_up_computer],
-
-        # d. 组合指令
-        "灯光全灭": ["关闭主灯", "关闭台灯", "关闭副灯"],
-
-        # e. 混合指令
+        "请关电脑": ["关闭我的电脑"],
+        "重启电脑": ["我的电脑设置为一"],
+        "切换屏幕": ["我的电脑设置为三"],
+        "测试电脑": ["我的电脑设置为七"],
+        "联合关闭": ["关闭我的电脑", "关闭电视"],
         "联合启动": [wake_up_computer, "打开电视"],
     },
 
@@ -102,6 +113,26 @@ APP_CONFIG = AppConfigBuilder(
     # ... 其他配置，请参考 config.py 文件 ...
 ).build()
 ```
+
+#### `on(*devices)` 和 `off(*devices)`
+
+这两个辅助函数用于快速生成针对一组设备的“打开”或“关闭”小爱原生指令列表。在 `config.py` 中，你可以先定义好不同位置或类别的设备列表，然后直接使用 `on()` 或 `off()` 来生成组合指令。
+
+例如，在 `config.py` 中：
+```python
+lights_balcony = ["台灯", "副灯"]
+appliances_extra = ["空调", "风扇", "电视"]
+lights_all = [*lights_balcony, "主灯"]
+appliances_all = [*lights_all, *appliances_extra, "我的电脑"]
+
+# ... 然后在 direct_vad_command_map 中使用
+"点亮阳台": on(*lights_balcony),
+"熄灭阳台": off(*lights_balcony),
+"灯光全灭": off(*lights_all),
+"全部关闭": off(*appliances_all),
+```
+
+这使得管理大量设备的开关指令变得非常简洁和灵活。
 
 #### `direct_vad_command_map`
 
@@ -225,24 +256,34 @@ APP_CONFIG = AppConfigBuilder(
     # 1. Wake-word-free commands that execute directly
     direct_vad_command_map={
         # a. Map multiple phrases to the same action
-        **map_all_to(("switch TV", "turn on the TV"), ["turn on TV"]),
+        **map_all_to(("adjust color", "switch color temperature", "turn on night light", "turn off night light"), ["color temperature segment"]),
 
         # b. Batch generate on/off commands
-        **map_the_switches("AC", "Fan", "Lamp"),
+        **map_the_switches(*lights_all, *appliances_extra),
         # The line above is equivalent to:
         # "turn on AC": ["turn on AC"], "turn off AC": ["turn off AC"],
         # "turn on Fan": ["turn on Fan"], "turn off Fan": ["turn off Fan"],
         # ...
 
         # c. Map a command to a custom Python function
+        "AC speed up": ["AC fan speed up"],
+        "AC speed down": ["AC fan speed down"],
+        "AC cool down": ["AC temperature down"],
+        "AC heat up": ["AC temperature up"],
+        "fan timer": ["fan timer"],
+        "fan mode": ["adjust fan mode"],
+        "light up balcony": on(*lights_balcony),
+        "turn off balcony lights": off(*lights_balcony),
+        "all lights off": off(*lights_all),
+        "turn off AC lights": off(*lights_all, "AC"),
+        "turn all off": off(*appliances_all),
         "turn on PC": [wake_up_computer],
-
-        # d. Combined command
-        "lights out": ["turn off main light", "turn off desk lamp", "turn off side lamp"],
-
-        # e. Mixed command
+        "turn off PC": ["turn off my PC"],
+        "restart PC": ["set my PC to one"],
+        "switch screen": ["set my PC to three"],
+        "test PC": ["set my PC to seven"],
+        "joint shutdown": ["turn off my PC", "turn off TV"],
         "joint startup": [wake_up_computer, "turn on TV"],
-    },
 
     # 2. Keywords to "wake up" Xiaozhi for continuous dialogue
     direct_vad_wakeup_keywords=["hey zhi"],
@@ -253,6 +294,26 @@ APP_CONFIG = AppConfigBuilder(
     # ... other configurations, please refer to the config.py file ...
 ).build()
 ```
+
+#### `on(*devices)` and `off(*devices)`
+
+These two helper functions are used to quickly generate lists of native Xiaoai "turn on" or "turn off" commands for a group of devices. In `config.py`, you can first define lists of devices by location or category, and then directly use `on()` or `off()` to generate combined commands.
+
+For example, in `config.py`:
+```python
+lights_balcony = ["balcony lamp", "side lamp"]
+appliances_extra = ["AC", "Fan", "TV"]
+lights_all = [*lights_balcony, "main light"]
+appliances_all = [*lights_all, *appliances_extra, "my PC"]
+
+# ... then use in direct_vad_command_map
+"light up balcony": on(*lights_balcony),
+"turn off balcony lights": off(*lights_balcony),
+"all lights off": off(*lights_all),
+"turn all off": off(*appliances_all),
+```
+
+This makes managing on/off commands for a large number of devices very concise and flexible.
 
 #### `direct_vad_command_map`
 

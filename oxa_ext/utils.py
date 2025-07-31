@@ -1,5 +1,5 @@
 from oxa_ext.type_defines import SpeakerProtocol, Actions
-from typing import Any
+from typing import Any, Literal
 import os
 import subprocess
 import asyncio
@@ -37,7 +37,8 @@ def ensure_dependencies(requirements: list[str]):
     print("依赖安装完成。")
 
 
-def map_the_switches(*devices: str) -> dict:
+def map_the_switches(*devices: str,
+                     type: Literal["on", "off", "all"] = "all") -> dict:
     """
     根据一个包含设备名称的列表，生成对应的开关指令字典。
 
@@ -52,16 +53,46 @@ def map_the_switches(*devices: str) -> dict:
         # 使用 f-string 格式化字符串，代码更简洁易读
 
         # 生成“开”指令
-        on_key = f"请开{device}"
-        on_value = [f"打开{device}"]
-        command_dict[on_key] = on_value
+        if type == "on" or type == "all":
+            on_key = f"请开{device}"
+            on_value = [f"打开{device}"]
+            command_dict[on_key] = on_value
 
         # 生成“关”指令
-        off_key = f"请关{device}"
-        off_value = [f"关闭{device}"]
-        command_dict[off_key] = off_value
+        if type == "off" or type == "all":
+            off_key = f"请关{device}"
+            off_value = [f"关闭{device}"]
+            command_dict[off_key] = off_value
 
     return command_dict
+
+
+def switch_cmds(*devices: str,
+                type: Literal["on", "off", "all"] = "all") -> list:
+    """
+    快速生成开关设备的小爱原生指令列表。
+    """
+    commands = []
+    for device in devices:
+        if type == "on" or type == "all":
+            commands.append(f"打开{device}")
+        if type == "off" or type == "all":
+            commands.append(f"关闭{device}")
+    return commands
+
+
+def off(*devices: str) -> list:
+    """
+    快速生成关闭设备的小爱原生指令列表。
+    """
+    return switch_cmds(*devices, type="off")
+
+
+def on(*devices: str) -> list:
+    """
+    快速生成打开设备的小爱原生指令列表。
+    """
+    return switch_cmds(*devices, type="on")
 
 
 async def interrupt_xiaoai(speaker: SpeakerProtocol):

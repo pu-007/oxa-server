@@ -1,4 +1,4 @@
-from oxa_ext.type_defines import SpeakerProtocol, Actions
+from oxa_ext.type_defines import SpeakerProtocol, Actions, ActionFunction
 from typing import Any, Literal
 import os
 import subprocess
@@ -102,6 +102,23 @@ async def interrupt_xiaoai(speaker: SpeakerProtocol):
     """
     await speaker.abort_xiaoai()
     await asyncio.sleep(2)
+
+
+def wol(computer_mac: str, broadcast_ip: str) -> ActionFunction:
+    """
+    发送网络唤醒 (Wake-on-LAN) 魔法包来启动电脑。
+    请确保已安装 'wakeonlan' 库，并替换为您的 MAC 地址和广播 IP。
+    """
+    ensure_dependencies(["wakeonlan"])
+
+    async def wake_up_computer(_: SpeakerProtocol):
+        from wakeonlan import send_magic_packet
+        await asyncio.to_thread(send_magic_packet,
+                                computer_mac,
+                                ip_address=broadcast_ip)
+        print(f"已向 {computer_mac} 发送网络唤醒包。")
+
+    return wake_up_computer
 
 
 class AppConfigBuilder:

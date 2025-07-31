@@ -110,8 +110,23 @@ APP_CONFIG = AppConfigBuilder(
     # 3. 在小爱原生对话中，用于“抢麦”并唤醒小智的关键词
     xiaoai_wakeup_keywords=["召唤小智"],
 
+    on_execute_play_text="", # 禁用执行指令后的提示音，保持安静
+
     # ... 其他配置，请参考 config.py 文件 ...
 ).build()
+```
+
+#### `wol(computer_mac, broadcast_ip)`
+
+一个辅助函数，用于生成网络唤醒 (Wake-on-LAN) 的指令。它会发送一个魔法包来启动指定 MAC 地址的电脑。
+
+```python
+# config.py
+wake_up_computer = wol(computer_mac="08BFB8A67CE2",
+                       broadcast_ip="192.168.100.255")
+
+# ... 然后在 direct_vad_command_map 中使用
+"请开电脑": [wake_up_computer],
 ```
 
 #### `on(*devices)` 和 `off(*devices)`
@@ -291,8 +306,23 @@ APP_CONFIG = AppConfigBuilder(
     # 3. Keywords to "interrupt" native Xiaoai and wake up Xiaozhi
     xiaoai_wakeup_keywords=["summon xiaozhi"],
 
+    on_execute_play_text="", # Disable the prompt sound after command execution for quiet operation
+
     # ... other configurations, please refer to the config.py file ...
 ).build()
+```
+
+#### `wol(computer_mac, broadcast_ip)`
+
+A helper function to generate Wake-on-LAN (WOL) commands. It sends a magic packet to start a computer with the specified MAC address.
+
+```python
+# config.py
+wake_up_computer = wol(computer_mac="08BFB8A67CE2",
+                       broadcast_ip="192.168.100.255")
+
+# ... then use in direct_vad_command_map
+"turn on PC": [wake_up_computer],
 ```
 
 #### `on(*devices)` and `off(*devices)`

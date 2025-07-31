@@ -1,29 +1,15 @@
 # -*- coding: utf-8 -*-
-import asyncio
 
-from oxa_ext.utils import ensure_dependencies, map_all_to, map_the_switches, off, on, AppConfigBuilder
-
-
-async def wake_up_computer(_):
-    """
-    发送网络唤醒 (Wake-on-LAN) 魔法包来启动电脑。
-    请确保已安装 'wakeonlan' 库，并替换为您的 MAC 地址和广播 IP。
-    """
-    ensure_dependencies(["wakeonlan"])
-    computer_mac = "08BFB8A67CE2"
-    subnet_broadcast_ip = "192.168.100.255"
-    from wakeonlan import send_magic_packet
-    await asyncio.to_thread(send_magic_packet,
-                            computer_mac,
-                            ip_address=subnet_broadcast_ip)
-    print(f"已向 {computer_mac} 发送网络唤醒包。")
-
+from oxa_ext.utils import map_all_to, map_the_switches, off, on, wol, AppConfigBuilder
 
 lights_balcony = ["台灯", "副灯"]
 appliances_extra = ["空调", "风扇", "电视"]
 
 lights_all = [*lights_balcony, "主灯"]
 appliances_all = [*lights_all, *appliances_extra, "我的电脑"]
+
+wake_up_computer = wol(computer_mac="08BFB8A67CE2",
+                       broadcast_ip="192.168.100.255")
 
 APP_CONFIG = AppConfigBuilder(
     direct_vad_wakeup_keywords=["小智小智"],

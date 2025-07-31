@@ -156,4 +156,5 @@ class SpeakerProtocol(Protocol):
         ...
 
 
-Actions = list[str | Callable[[SpeakerProtocol], Awaitable[None]]]
+ActionFunction = Callable[[SpeakerProtocol], Awaitable[None]]
+Actions = list[str | ActionFunction]

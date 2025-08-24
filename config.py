@@ -15,7 +15,9 @@ APP_CONFIG = AppConfigBuilder(
     direct_vad_wakeup_keywords=["小智小智"],
     direct_vad_command_map={
         ## 小爱同学原生指令
-        **map_all_to(("调整颜色", "切换色温", "请开夜灯", "请关夜灯"), ["色温分段"]),
+        **map_all_to(("调整颜色", "切换色温", "请关夜灯"), ["色温分段"]),
+        # 小爱的自然语言处理会对一些指令无法识别，尤其是手动控制指令，需要换个说法
+        "请开夜灯": ["分段色温"],
         **map_the_switches(*lights_all, *appliances_extra),
         "空调升速": ["空调风速升高"],
         "空调降速": ["空调风速降低"],
@@ -23,11 +25,16 @@ APP_CONFIG = AppConfigBuilder(
         "空调升温": ["空调温度升高"],
         "风扇定时": ["风扇计时器"],
         "风扇风类": ["调整风类"],
-        "点亮阳台": on(*lights_balcony),
-        "熄灭阳台": off(*lights_balcony),
-        "灯光全灭": off(*lights_all),
-        "关灯空调": off(*lights_all, "空调"),
-        "全部关闭": off(*appliances_all),
+        "点亮阳台":
+        on(*lights_balcony),
+        "熄灭阳台":
+        off(*lights_balcony),
+        "灯光全灭":
+        off(*lights_all),
+        "关灯空调":
+        off(*lights_all, "空调"),
+        "全部关闭":
+        off(*appliances_all),
         "请开电脑": [wake_up_computer],
         "请关电脑": ["关闭我的电脑"],
         "重启电脑": ["我的电脑设置为一"],

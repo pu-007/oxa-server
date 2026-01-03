@@ -4,6 +4,8 @@
 
 ---
 
+(hass integration is coming soon...)
+
 ## 中文 <a name="中文"></a>
 
 ### 简介

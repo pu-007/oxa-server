@@ -121,6 +121,36 @@ def wol(computer_mac: str, broadcast_ip: str) -> ActionFunction:
     return wake_up_computer
 
 
+def hass_action(url: str, token: str, domain: str, service: str,
+                entity_id: str) -> ActionFunction:
+    """
+    调用 Home Assistant 的 REST API 服务。
+    """
+    ensure_dependencies(["aiohttp"])
+
+    async def _call_hass(_: SpeakerProtocol):
+        import aiohttp
+        api_url = f"{url.rstrip('/')}/api/services/{domain}/{service}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        payload = {"entity_id": entity_id}
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(api_url, headers=headers,
+                                        json=payload) as response:
+                    if response.status == 200:
+                        print(f"HASS 指令成功: {domain}.{service} -> {entity_id}")
+                    else:
+                        text = await response.text()
+                        print(f"HASS 指令失败 ({response.status}): {text}")
+        except Exception as e:
+            print(f"HASS 请求异常: {e}")
+
+    return _call_hass
+
+
 class AppConfigBuilder:
     """
     一个用于构建 APP_CONFIG 的构建器类。

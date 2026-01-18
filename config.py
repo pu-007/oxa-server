@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 
-from oxa_ext.utils import map_all_to, map_the_switches, off, on, wol, hass_action, AppConfigBuilder
+from oxa_ext.utils import map_all_to, map_the_switches, off, on, wol, hass_action, AppConfigBuilder, xiaoai_play
 from oxa_ext.type_defines import ActionFunction
 
 lights_balcony = ["台灯", "副灯"]
 appliances_extra = ["空调", "风扇", "电视"]
 
 appliances_all = [*lights_balcony, *appliances_extra, "我的电脑"]
-
-
-async def wake_up_computer(speaker):
-    wol(computer_mac="08BFB8A67CE2", broadcast_ip="192.168.100.255")
-    await speaker.play(text="正在开启")
 
 
 # --- Home Assistant 配置 ---
@@ -35,6 +30,9 @@ off_main_light = [
              service="turn_off",
              entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan")
 ]
+
+wake_up_computer = wol(computer_mac="08BFB8A67CE2",
+                       broadcast_ip="192.168.100.255")
 
 APP_CONFIG = AppConfigBuilder(
     direct_vad_wakeup_keywords=["小智小智"],
@@ -60,7 +58,7 @@ APP_CONFIG = AppConfigBuilder(
         ######## 分组控制
         "关灯空调": [*off(*lights_balcony, "空调"), *off_main_light],
         "全部关闭": [*off(*appliances_all), *off_main_light],
-        "请开电脑": [wake_up_computer],
+        "请开电脑": [wake_up_computer, xiaoai_play("正在打开")],
         "请关电脑": ["关闭我的电脑"],
         "重启电脑": ["我的电脑设置为一"],
         "切换屏幕": ["我的电脑设置为三"],
@@ -75,7 +73,18 @@ APP_CONFIG = AppConfigBuilder(
         "风扇风类": ["调整风类"],
     },
     xiaoai_wakeup_keywords=["召唤小智"],
-    xiaoai_extension_command_map={},
+    xiaoai_extension_command_map={
+        "开灯": [
+            hass_ctl(domain="input_boolean",
+                     service="turn_on",
+                     entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan")
+        ],
+        "关灯": [
+            hass_ctl(domain="input_boolean",
+                     service="turn_off",
+                     entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan")
+        ]
+    },
     on_execute_play_text="",
     vad_config={
         "boost": 100,

@@ -1,5 +1,5 @@
 from oxa_ext.type_defines import SpeakerProtocol, Actions, ActionFunction
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 import os
 import subprocess
 import asyncio
@@ -119,6 +119,20 @@ def wol(computer_mac: str, broadcast_ip: str) -> ActionFunction:
         print(f"已向 {computer_mac} 发送网络唤醒包。")
 
     return wake_up_computer
+
+
+def xiaoai_play(
+    text: Optional[str] = None,
+    url: Optional[str] = None,
+    buffer: Optional[bytes] = None,
+    blocking: bool = True,
+    timeout: int = 10 * 60 * 1000,
+):
+
+    async def _play(speaker: SpeakerProtocol):
+        await speaker.play(text, url, buffer, blocking, timeout)
+
+    return _play
 
 
 def hass_action(url: str, token: str, domain: str, service: str,

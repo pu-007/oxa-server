@@ -21,8 +21,26 @@
 - **结构化配置**：使用 `AppConfigBuilder` 构建器，配置逻辑更清晰、更易于维护。
 - **免唤醒指令**：将常用指令配置为免唤醒关键词，直接说出即可执行，无需先说 "小爱同学"。
 - **强大的指令映射**：轻松将一句口语指令映射到一个或多个动作（原生指令或自定义函数）。
+- **Home Assistant 集成**：内置 `hass_action` 辅助函数，轻松调用 Home Assistant 的各种服务。
+- **自定义音频播放**：使用 `xiaoai_play` 在执行指令过程中播放自定义文本、在线音频或二进制音频流。
 - **Python 函数无缝集成**：可以直接在指令中调用自定义的 Python 函数（同步或异步），实现网络唤醒（WOL）、API 调用、执行 Shell 命令等复杂操作。
 - **依赖自动安装**：如果自定义函数需要新的 Python 包，脚本会自动尝试安装，简化部署。
+
+### 核心概念
+
+在自定义配置之前，理解以下两个概念至关重要：
+
+#### 1. `ActionFunction` (动作函数)
+这是一个异步函数，定义为 `Callable[[SpeakerProtocol], Awaitable[None]]`。
+- **参数**：它接收一个 `SpeakerProtocol` 对象作为唯一参数，通过该对象你可以直接控制音箱（如 `play` 播放音频、`ask_xiaoai` 执行原生指令、`run_shell` 执行 Linux 命令等）。
+- **用途**：用于实现复杂的逻辑，如网络唤醒（WOL）、调用外部 API 或多步交互。
+- **示例**：`wol()`、`xiaoai_play()` 和 `hass_action()` 的返回值都是 `ActionFunction`。
+
+#### 2. `Actions` (动作列表)
+这是指令映射表中的“值”，定义为 `list[str | ActionFunction]`。
+- **组成**：它可以包含**字符串**（代表小爱同学的原生语音指令）或 **`ActionFunction`**。
+- **执行逻辑**：小智会按顺序依次执行列表中的每一个动作。你可以自由组合原生指令和自定义 Python 代码。
+- **示例**：`["打开电视", wake_up_computer]` 会先让小爱执行“打开电视”的动作，然后运行 `wake_up_computer` 函数。
 
 ### 🚀 如何使用
 
@@ -98,7 +116,7 @@ APP_CONFIG = AppConfigBuilder(
         "灯光全灭": off(*lights_all),
         "关灯空调": off(*lights_all, "空调"),
         "全部关闭": off(*appliances_all),
-        "请开电脑": [wake_up_computer],
+        "请开电脑": [wake_up_computer, xiaoai_play("正在打开")],
         "请关电脑": ["关闭我的电脑"],
         "重启电脑": ["我的电脑设置为一"],
         "切换屏幕": ["我的电脑设置为三"],
@@ -112,6 +130,15 @@ APP_CONFIG = AppConfigBuilder(
 
     # 3. 在小爱原生对话中，用于“抢麦”并唤醒小智的关键词
     xiaoai_wakeup_keywords=["召唤小智"],
+
+    # 4. 扩展指令映射，可在与小爱对话时直接拦截执行
+    xiaoai_extension_command_map={
+        "开灯": [
+            hass_ctl(domain="input_boolean",
+                     service="turn_on",
+                     entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan")
+        ],
+    },
 
     on_execute_play_text="", # 禁用执行指令后的提示音，保持安静
 
@@ -130,6 +157,28 @@ wake_up_computer = wol(computer_mac="08BFB8A67CE2",
 
 # ... 然后在 direct_vad_command_map 中使用
 "请开电脑": [wake_up_computer],
+```
+
+#### `xiaoai_play(text=None, url=None, buffer=None)`
+
+在指令执行序列中插入一个播放动作。可以播放文本（TTS）、在线音频 URL 或二进制音频流。
+
+```python
+# 执行开机指令的同时，让音箱说话
+"请开电脑": [wake_up_computer, xiaoai_play("正在打开")],
+```
+
+#### `hass_action(url, token, domain, service, entity_id)`
+
+用于向 Home Assistant 发送服务调用请求。
+
+```python
+# 建议在 config.py 中封装一个 hass_ctl 简化调用
+def hass_ctl(**kwargs):
+    return hass_action(url="你的HASS地址", token="你的令牌", **kwargs)
+
+# 使用示例
+"开灯": [hass_ctl(domain="light", service="turn_on", entity_id="light.bedroom")]
 ```
 
 #### `on(*devices)` 和 `off(*devices)`
@@ -154,12 +203,12 @@ appliances_all = [*lights_all, *appliances_extra, "我的电脑"]
 
 #### `direct_vad_command_map`
 
-这是最核心的**免唤醒指令表**。当小爱同学识别到这里的键（key），会直接执行对应的值（value），无需先说“小爱同学”。
+这是最核心的**免唤醒指令表**。当小爱同学识别到这里的键（key），会直接执行对应的值（value，即 `Actions` 列表），无需先说“小爱同学”。
 
-- **值（Actions）** 可以是：
-  - `["小爱原生指令"]`: 一个包含字符串的列表，将执行小爱音箱的原生指令。
-  - `[自定义函数]`: 一个包含 Python 函数的列表，将直接调用你定义的函数。
-  - 混合列表: `[自定义函数, "小爱原生指令", ...]`，将按顺序执行。
+- **列表项 (Actions)** 可以是：
+  - **字符串**: `["小爱原生指令"]`，将执行小爱音箱的原生指令。
+  - **ActionFunction**: `[自定义函数]`，将直接调用你定义的函数。
+  - **混合模式**: `[自定义函数, "小爱原生指令", ...]`，将按顺序执行。
 
 #### `map_the_switches(*devices)`
 
@@ -224,8 +273,26 @@ It is designed to significantly enhance and customize the functionality of your 
 - **Structured Configuration**: Uses the `AppConfigBuilder` for a cleaner and more maintainable configuration logic.
 - **Wake-Word-Free Commands**: Configure frequently used commands to be executed directly without saying the "Xiaoai Tongxue" wake-word first.
 - **Powerful Command Mapping**: Easily map a spoken phrase to one or more actions (native commands or custom functions).
+- **Home Assistant Integration**: Built-in `hass_action` helper to easily call various Home Assistant services.
+- **Custom Audio Playback**: Use `xiaoai_play` to play custom text, online audio, or binary audio streams during command execution.
 - **Seamless Python Function Integration**: Directly call custom Python functions (sync or async) within commands to perform complex operations like Wake-on-LAN (WOL), API calls, or executing shell commands.
 - **Automatic Dependency Installation**: If a custom function requires a new Python package, the script will automatically attempt to install it, simplifying deployment.
+
+### Core Concepts
+
+Before diving into configuration, it's essential to understand these two key concepts:
+
+#### 1. `ActionFunction`
+An asynchronous function defined as `Callable[[SpeakerProtocol], Awaitable[None]]`.
+- **Parameter**: It takes a `SpeakerProtocol` object as its only argument. Through this object, you can directly control the speaker (e.g., `play` audio, `ask_xiaoai` to execute native commands, `run_shell` for Linux commands).
+- **Purpose**: Used for complex logic like Wake-on-LAN (WOL), calling external APIs, or multi-step interactions.
+- **Example**: The return values of `wol()`, `xiaoai_play()`, and `hass_action()` are all `ActionFunction`s.
+
+#### 2. `Actions` (Action List)
+The "value" in the command mapping table, defined as `list[str | ActionFunction]`.
+- **Composition**: It can contain **strings** (representing native Xiaoai voice commands) or **`ActionFunction`s**.
+- **Execution Logic**: Xiaozhi executes each action in the list sequentially. You can freely mix native commands and custom Python code.
+- **Example**: `["Turn on TV", wake_up_computer]` will first have Xiaoai execute the "Turn on TV" command, then run the `wake_up_computer` function.
 
 ### 🚀 How to Use
 
@@ -301,19 +368,29 @@ APP_CONFIG = AppConfigBuilder(
         "all lights off": off(*lights_all),
         "turn off AC lights": off(*lights_all, "AC"),
         "turn all off": off(*appliances_all),
-        "turn on PC": [wake_up_computer],
+        "turn on PC": [wake_up_computer, xiaoai_play("Opening")],
         "turn off PC": ["turn off my PC"],
         "restart PC": ["set my PC to one"],
         "switch screen": ["set my PC to three"],
         "test PC": ["set my PC to seven"],
         "joint shutdown": ["turn off my PC", "turn off TV"],
         "joint startup": [wake_up_computer, "turn on TV"],
+    },
 
     # 2. Keywords to "wake up" Xiaozhi for continuous dialogue
     direct_vad_wakeup_keywords=["hey zhi"],
 
     # 3. Keywords to "interrupt" native Xiaoai and wake up Xiaozhi
     xiaoai_wakeup_keywords=["summon xiaozhi"],
+
+    # 4. Extension command map to intercept native Xiaoai dialogue
+    xiaoai_extension_command_map={
+        "turn on light": [
+            hass_ctl(domain="input_boolean",
+                     service="turn_on",
+                     entity_id="input_boolean.your_light_id")
+        ],
+    },
 
     on_execute_play_text="", # Disable the prompt sound after command execution for quiet operation
 
@@ -332,6 +409,28 @@ wake_up_computer = wol(computer_mac="08BFB8A67CE2",
 
 # ... then use in direct_vad_command_map
 "turn on PC": [wake_up_computer],
+```
+
+#### `xiaoai_play(text=None, url=None, buffer=None)`
+
+Inserts a playback action into the command execution sequence. It can play text (TTS), online audio URLs, or binary audio streams.
+
+```python
+# While executing the boot command, have the speaker say something
+"turn on PC": [wake_up_computer, xiaoai_play("Opening")],
+```
+
+#### `hass_action(url, token, domain, service, entity_id)`
+
+Used to send service call requests to Home Assistant.
+
+```python
+# Recommended to wrap hass_ctl in config.py to simplify calls
+def hass_ctl(**kwargs):
+    return hass_action(url="YOUR_HASS_URL", token="YOUR_TOKEN", **kwargs)
+
+# Usage example
+"turn on light": [hass_ctl(domain="light", service="turn_on", entity_id="light.bedroom")]
 ```
 
 #### `on(*devices)` and `off(*devices)`
@@ -356,12 +455,12 @@ This makes managing on/off commands for a large number of devices very concise a
 
 #### `direct_vad_command_map`
 
-This is the core **wake-word-free command table**. When Xiaoai Speaker recognizes a key from this map, it will execute the corresponding value directly.
+This is the core **wake-word-free command table**. When Xiaoai Speaker recognizes a key from this map, it will execute the corresponding value (an `Actions` list) directly.
 
-- **Value (Actions)** can be:
-  - `["Native Xiaoai Command"]`: A list of strings for native commands.
-  - `[custom_function]`: A list containing a Python function to be called.
-  - A mixed list: `[custom_function, "Native Command", ...]`, executed in sequence.
+- **List Items (Actions)** can be:
+  - **String**: `["Native Xiaoai Command"]`, for native commands.
+  - **ActionFunction**: `[custom_function]`, a Python function to be called.
+  - **Mixed Mode**: `[custom_function, "Native Command", ...]`, executed in sequence.
 
 #### `map_the_switches(*devices)`
 

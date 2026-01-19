@@ -93,9 +93,9 @@ APP_CONFIG = AppConfigBuilder(
         "min_silence_duration": 300,
     },
     xiaozhi_config={
-        "OTA_URL": "https://2662r3426b.vicp.fun/xiaozhi/ota/",
-        "WEBSOCKET_URL": "wss://2662r3426b.vicp.fun/xiaozhi/v1/",
+        "OTA_URL": "https://api.tenclass.net/xiaozhi/ota/",
+        "WEBSOCKET_URL": "wss://api.tenclass.net/xiaozhi/v1/",
         "WEBSOCKET_ACCESS_TOKEN": "",
         "DEVICE_ID": "70:70:fc:05:83:fa",
-        "VERIFICATION_CODE": "976551",
+        "VERIFICATION_CODE": "387661",
     }).build()

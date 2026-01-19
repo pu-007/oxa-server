@@ -44,7 +44,7 @@
 
 ### 🚀 如何使用
 
-#### 1. 准备工作：成功运行原版 `open-xiaoai`
+#### 1. 准备工作：成功运行原版 `open-xiaoai` （已运行可直接跳过）
 
 本项目是 `open-xiaoai` 的一个**增强配置**，而非独立应用。因此，你 **必须** 首先根据官方文档成功部署并运行 `open-xiaoai` 的 `xiaozhi` 示例。这一步是为了确保你的基础环境、设备连接和 Token 等都是正常的。
 
@@ -82,7 +82,7 @@ docker stop oxa-server && docker rm oxa-server
       -v "$(pwd)/config.py:/app/config.py" \
       -v "$(pwd)/oxa_ext:/app/oxa_ext" \
       --restart=always \
-      idootop/open-xiaoai:xiaozhi
+      idootop/open-xiaoai-xiaozhi:latest
     ```
 
 ### ⚙️ 配置说明
@@ -334,7 +334,7 @@ The process is almost identical to the official steps, with the only difference 
       -v "$(pwd)/config.py:/app/config.py" \
       -v "$(pwd)/oxa_ext:/app/oxa_ext" \
       --restart=always \
-      idootop/open-xiaoai:xiaozhi
+      idootop/open-xiaoai-xiaozhi:latest
     ```
 
 ### ⚙️ Configuration Explanation

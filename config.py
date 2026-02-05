@@ -1,6 +1,15 @@
 # -*- coding: utf-8 -*-
 
-from oxa_ext.utils import map_all_to, map_the_switches, off, on, wol, hass_action, AppConfigBuilder, xiaoai_play
+from oxa_ext.utils import (
+    map_all_to,
+    map_the_switches,
+    off,
+    on,
+    wol,
+    hass_action,
+    AppConfigBuilder,
+    xiaoai_play,
+)
 from oxa_ext.type_defines import ActionFunction
 
 lights_balcony = ["台灯", "副灯"]
@@ -19,20 +28,23 @@ def hass_ctl(**kwargs) -> ActionFunction:
 
 on_main_light = [
     "打开主灯",
-    hass_ctl(domain="input_boolean",
-             service="turn_on",
-             entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan")
+    hass_ctl(
+        domain="input_boolean",
+        service="turn_on",
+        entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan",
+    ),
 ]
 
 off_main_light = [
     "关闭主灯",
-    hass_ctl(domain="input_boolean",
-             service="turn_off",
-             entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan")
+    hass_ctl(
+        domain="input_boolean",
+        service="turn_off",
+        entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan",
+    ),
 ]
 
-wake_up_computer = wol(computer_mac="08BFB8A67CE2",
-                       broadcast_ip="192.168.100.255")
+wake_up_computer = wol(computer_mac="08BFB8A67CE2", broadcast_ip="192.168.100.193")
 
 APP_CONFIG = AppConfigBuilder(
     direct_vad_wakeup_keywords=["小智小智"],
@@ -42,19 +54,15 @@ APP_CONFIG = AppConfigBuilder(
         "灯光全灭": [*off(*lights_balcony), *off_main_light],
         # 映射所有开关 （主灯单独设置）
         **map_the_switches(*lights_balcony, *appliances_extra),
-        "请开主灯":
-        on_main_light,
-        "请关主灯":
-        off_main_light,
+        "请开主灯": on_main_light,
+        "请关主灯": off_main_light,
         ######## 主灯相关设置
         # 色温调整
         **map_all_to(("调整颜色", "切换色温", "请关夜灯"), ["色温分段"]),
         # 夜灯 （分段色温实际上是米家中的相关手动控制，因为其他词汇可能会造成歧义或者无法被准确识别）
         "请开夜灯": ["分段色温"],
-        "点亮阳台":
-        on(*lights_balcony),
-        "熄灭阳台":
-        off(*lights_balcony),
+        "点亮阳台": on(*lights_balcony),
+        "熄灭阳台": off(*lights_balcony),
         ######## 分组控制
         "关灯空调": [*off(*lights_balcony, "空调"), *off_main_light],
         "全部关闭": [*off(*appliances_all), *off_main_light],
@@ -75,15 +83,19 @@ APP_CONFIG = AppConfigBuilder(
     xiaoai_wakeup_keywords=["召唤小智"],
     xiaoai_extension_command_map={
         "开灯": [
-            hass_ctl(domain="input_boolean",
-                     service="turn_on",
-                     entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan")
+            hass_ctl(
+                domain="input_boolean",
+                service="turn_on",
+                entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan",
+            )
         ],
         "关灯": [
-            hass_ctl(domain="input_boolean",
-                     service="turn_off",
-                     entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan")
-        ]
+            hass_ctl(
+                domain="input_boolean",
+                service="turn_off",
+                entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan",
+            )
+        ],
     },
     on_execute_play_text="",
     vad_config={
@@ -98,4 +110,5 @@ APP_CONFIG = AppConfigBuilder(
         "WEBSOCKET_ACCESS_TOKEN": "",
         "DEVICE_ID": "70:70:fc:05:83:fa",
         "VERIFICATION_CODE": "387661",
-    }).build()
+    },
+).build()

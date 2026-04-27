@@ -134,9 +134,8 @@ def xiaoai_play(
 
     return _play
 
-
 def hass_action(url: str, token: str, domain: str, service: str,
-                entity_id: str) -> ActionFunction:
+                entity_id: str = None) -> ActionFunction:
     """
     调用 Home Assistant 的 REST API 服务。
     """
@@ -149,21 +148,29 @@ def hass_action(url: str, token: str, domain: str, service: str,
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         }
-        payload = {"entity_id": entity_id}
+        
+        # 如果提供了 entity_id，则打包进 payload；如果没有则传空 JSON
+        payload = {"entity_id": entity_id} if entity_id else {}
+        
+        # 加上明显的调试打印，方便在控制台/日志中查看
+        print(f"\n========== HASS 调试信息 ==========")
+        print(f"正在请求: {api_url}")
+        print(f"请求数据: {payload}")
+        
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(api_url, headers=headers,
-                                        json=payload) as response:
+                async with session.post(api_url, headers=headers, json=payload) as response:
+                    text = await response.text()
                     if response.status == 200:
-                        print(f"HASS 指令成功: {domain}.{service} -> {entity_id}")
+                        print(f"✅ HASS 指令成功 ({response.status}) -> 目标: {domain}.{service} | 实体: {entity_id}")
                     else:
-                        text = await response.text()
-                        print(f"HASS 指令失败 ({response.status}): {text}")
+                        print(f"❌ HASS 指令失败 ({response.status}) -> 返回信息: {text}")
         except Exception as e:
-            print(f"HASS 请求异常: {e}")
+            print(f"❌ HASS 网络请求异常: {e}")
+            print(f"请检查是否能在运行此代码的机器上访问 {url}")
+        print(f"===================================\n")
 
     return _call_hass
-
 
 class AppConfigBuilder:
     """

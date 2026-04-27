@@ -25,23 +25,22 @@ def hass_ctl(**kwargs) -> ActionFunction:
     HASS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI0OTVlMDdjMDRlYTU0OTYwYjhjMWY4ODhjNTc1MTQxZCIsImlhdCI6MTc2NzQxNTU0NCwiZXhwIjoyMDgyNzc1NTQ0fQ.lTJuOP5XrX6ppVhmOI-jPA8FMTplhlOL6RM35kMOf5c"  # 替换为你的长期访问令牌
     return hass_action(url=HASS_URL, token=HASS_TOKEN, **kwargs)
 
-
-on_main_light = [
-    "打开主灯",
+# 开启主灯（执行脚本）
+on_main_light =[
     hass_ctl(
-        domain="input_boolean",
+        domain="script",
         service="turn_on",
-        entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan",
-    ),
+        entity_id="script.on_main_light"
+    )
 ]
 
-off_main_light = [
-    "关闭主灯",
+# 关闭主灯（执行脚本）
+off_main_light =[
     hass_ctl(
-        domain="input_boolean",
-        service="turn_off",
-        entity_id="input_boolean.zhu_deng_zhi_neng_kai_guan",
-    ),
+        domain="script",
+        service="turn_on",  # 依然是 turn_on
+        entity_id="script.off_main_light"
+    )
 ]
 
 wake_up_computer = wol(computer_mac="08BFB8A67CE2", broadcast_ip="192.168.100.193")
